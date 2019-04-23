@@ -1,0 +1,52 @@
+package com.qxiao.wx.community.jpa.service.impl;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.community.jpa.dao.QmCommunityCommentDao;
+import com.qxiao.wx.community.jpa.entity.QmCommunityComment;
+import com.qxiao.wx.community.jpa.service.IQmCommunityCommentServicve;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+
+@Service
+public class QmCommunityCommentServicveImpl extends AbstractJdbcService<QmCommunityComment>
+		implements IQmCommunityCommentServicve {
+
+	@Autowired
+	private QmCommunityCommentDao commentDao;
+
+	@Override
+	public QmCommunityComment communityComment(String openId, String textContent, Long communityId) {
+		QmCommunityComment comment = new QmCommunityComment();
+		comment.setCommunityId(communityId);
+		comment.setTextContent(textContent);
+		comment.setOpenId(openId);
+		comment.setPostTime(new Date());
+		return commentDao.save(comment);
+	}
+
+	@Override
+	public JPADao<QmCommunityComment> getDao() {
+		return this.commentDao;
+	}
+
+	@Override
+	public Class<QmCommunityComment> getEntityClass() {
+		return QmCommunityComment.class;
+	}
+
+}
+
+
+
+
+
+
+
+
+
+
+

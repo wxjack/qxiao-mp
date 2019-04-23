@@ -1,0 +1,7 @@
+package com.qxiao.wx.community.jpa.service;
+
+public interface IQmCommunityPraiseService {
+	
+	// 点赞
+	void communityPraise(String openId, Long communityId);
+}

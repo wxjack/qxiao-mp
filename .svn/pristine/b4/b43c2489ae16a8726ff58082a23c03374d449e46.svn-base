@@ -1,0 +1,10 @@
+package com.qxiao.wx.user.jpa.dao;
+
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmAccountDao extends JPADao<QmAccount>{
+
+	QmAccount findByOpenId(String openId);
+
+}

@@ -1,0 +1,8 @@
+package com.qxiao.wx.homework.jpa.dao;
+
+import com.qxiao.wx.homework.jpa.entity.QmHomeworkSender;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmHomeworkSenderDao extends JPADao<QmHomeworkSender>{
+
+}

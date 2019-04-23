@@ -1,0 +1,231 @@
+package com.qxiao.wx.user.jpa.service.impl;
+
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.community.jpa.dao.QmClassStudentDao;
+import com.qxiao.wx.community.jpa.entity.QmClassStudent;
+import com.qxiao.wx.user.jpa.dao.QmClockInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmClockStatDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolClassDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.entity.QmClockInfo;
+import com.qxiao.wx.user.jpa.entity.QmClockStat;
+import com.qxiao.wx.user.jpa.entity.QmMessageSend;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.qxiao.wx.user.jpa.service.PunchService;
+import com.qxiao.wx.user.vo.ClassClockQueryVo;
+import com.qxiao.wx.user.vo.CountClockStatVo;
+import com.qxiao.wx.user.vo.RealShuttleVo;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+
+@Service
+public class PunchServiceImpl extends AbstractJdbcService<QmClockInfo> implements PunchService {
+
+	@Autowired
+	QmClockInfoDao infoDao;
+	@Autowired
+	QmClockStatDao statDao;
+	@Autowired
+	QmStudentDao studentDao;
+	@Autowired
+	QmClassStudentDao classStudentDao;
+	@Autowired
+	QmPlaySchoolInfoDao schoolInfoDao;
+	@Autowired
+	QmPlaySchoolClassDao classDao;
+
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> queryStudentTime(Long studentId, String date, String type) {
+		String sql = "SELECT DATE_FORMAT(qci.post_time, '%H:%i') AS postTime, qs.student_name "
+				+ "FROM qm_clock_info AS qci LEFT JOIN qm_student AS qs ON ( qci.nfc_id = qs.nfc_id "
+				+ "OR qci.ibeacon_id = qs.ibeacon_id ) WHERE qs.student_id = ? AND DATE_FORMAT(qci.post_time, '%Y-%m-%d') = ? and qci.type=? ";
+		List<ClassClockQueryVo> findList = (List<ClassClockQueryVo>) this.findList(sql,
+				new Object[] { studentId, date, type }, ClassClockQueryVo.class);
+		Map<String, Object> map = new HashMap<>();
+		List<Object> li = new ArrayList<>();
+		if (findList.size() > 0) {
+			for (ClassClockQueryVo qs : findList) {
+				Map<String, Object> map1 = new HashMap<>();
+				map1.put("postTime", qs.getPostTime());
+				li.add(map1);
+			}
+			map.put("studentName", findList.get(0).getStudentName());
+			map.put("time", li);
+		}
+		return map;
+	}
+
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> queryCount(Long classId, String date) {
+		String sql = "SELECT DISTINCT(qcs.student_id) FROM qm_class_student AS qcs join qm_clock_info as qci "
+				+ "join qm_student as qs where  qcs.student_id=qs.student_id "
+				+ "and (qci.ibeacon_id=qs.ibeacon_id or qci.nfc_id=qs.nfc_id) and qcs.class_id= ? "
+				+ "and DATE_FORMAT(qci.post_time, '%Y-%m-%d')= ?";
+		List<QmStudent> findList = (List<QmStudent>) this.findList(sql, new Object[] { classId, date },
+				QmStudent.class);
+		Map<String, Object> queryStudentTime = new HashMap<>();
+		List<Object> li = new ArrayList<>();
+		for (QmStudent qs : findList) {
+			queryStudentTime = this.queryStudentTime(qs.getStudentId(), date, "1");
+			li.add(queryStudentTime);
+		}
+		Map<String, Object> map = new HashMap<>();
+		map.put("count", findList.size());
+		map.put("info", li);
+		return map;
+	}
+
+	public Map<String, Object> queryNotPunch(Long classId, String date) {
+		String sql = "SELECT qs.student_name FROM qm_student AS qs join qm_class_student as qsc "
+				+ "WHERE  not exists ( SELECT * FROM qm_clock_info AS qci WHERE qs.ibeacon_id = ibeacon_id "
+				+ "or qs.nfc_id=nfc_id and DATE_FORMAT(post_time,'%Y-%m-%d')= ?) "
+				+ "and qs.student_id=qsc.student_id and qsc.class_id=? ";
+		@SuppressWarnings("unchecked")
+		List<QmStudent> findList = (List<QmStudent>) this.findList(sql, new Object[] { date, classId },
+				QmStudent.class);
+		Map<String, Object> map = new HashMap<>();
+		List<Object> li = new ArrayList<>();
+		map.put("count", findList.size());
+		for (QmStudent qs : findList) {
+			Map<String, Object> ma = new HashMap<>();
+			ma.put("studentName", qs.getStudentName());
+			ma.put("time", "");
+			li.add(ma);
+		}
+		map.put("info", li);
+		return map;
+	}
+
+	@SuppressWarnings("unchecked")
+	public List<RealShuttleVo> realShuttle(String openId, Long classId, String date) {
+		String sql = "SELECT qs.student_id,qs.student_name,info.broadcast,info.post_time FROM "
+				+ "qm_student AS qs JOIN qm_class_student AS qcs JOIN qm_clock_info AS info "
+				+ "WHERE ( qs.ibeacon_id = info.ibeacon_id OR qs.nfc_id = info.nfc_id ) "
+				+ "AND info.broadcast = 0 AND qs.student_id = qcs.student_id AND qcs.class_id = ? "
+				+ "AND DATE_FORMAT(info.post_time, '%Y-%m-%d') = ? ORDER BY info.post_time ASC";
+		List<RealShuttleVo> findList = (List<RealShuttleVo>) this.findList(sql, new Object[] { classId, date },
+				RealShuttleVo.class);
+		return findList;
+	}
+
+	@SuppressWarnings("unchecked")
+	public List<ClassClockQueryVo> classClockQuery(String date, Long classId) {
+		String sql = "SELECT student.student_id,info.clock_id,student.student_name,info.broadcast,"
+				+ "info.post_time FROM qm_student AS student "
+				+ "LEFT JOIN qm_class_student AS cs ON student.student_id = cs.student_id "
+				+ "LEFT JOIN qm_clock_info AS info ON ( info.ibeacon_id = student.ibeacon_id "
+				+ "OR info.nfc_id = student.nfc_id ) and DATE_FORMAT(info.post_time, '%Y-%m-%d') = ? "
+				+ "WHERE cs.class_id =?  ORDER BY info.post_time DESC";
+		List<ClassClockQueryVo> list = (List<ClassClockQueryVo>) this.findList(sql, new Object[] { date, classId },
+				ClassClockQueryVo.class);
+		if (list.size() > 0) {
+			for (ClassClockQueryVo vo : list) {
+				if (vo.getClockId() != null) {
+					vo.setClockFlag(1);// 0-未打卡 1-已打卡
+				} else {
+					vo.setClockFlag(0);
+				}
+			}
+		}
+		return list;
+	}
+
+	public void punchClock(Integer type, String nfcId, String ibeaconId) {
+		QmClockInfo info = new QmClockInfo();
+		info.setIbeaconId(ibeaconId);
+		info.setNfcId(nfcId);
+		info.setType(type);
+		info.setBroadcast(0);
+		info.setMessageSend(0);
+		info.setPostTime(Calendar.getInstance().getTime());
+		infoDao.save(info);
+		QmMessageSend qms = new QmMessageSend();
+		qms.setMessageId(info.getClockId());
+	}
+
+	@SuppressWarnings("unchecked")
+	public List<QmClockInfo> clockQuery(String openId, Long studentId, String month) {
+		String sql = "SELECT info.clock_id,info.type,info.post_time FROM qm_clock_info as info "
+				+ "join qm_student as student WHERE (info.nfc_id=student.nfc_id or info.ibeacon_id=info.ibeacon_id) "
+				+ "and student.student_id=? and DATE_FORMAT(info.post_time,'%Y-%m')=?";
+		List<QmClockInfo> findList = (List<QmClockInfo>) this.findList(sql, new Object[] { studentId, month },
+				QmClockInfo.class);
+		return findList;
+	}
+
+	@SuppressWarnings("unchecked")
+	public void saveClockStat(String date) {
+		String sql = "select * from qm_play_school_info";
+		List<QmPlaySchoolInfo> findAll = (List<QmPlaySchoolInfo>) this.findList(sql, new Object[] {},
+				QmPlaySchoolInfo.class);
+		if (findAll.size() > 0) {
+			for (QmPlaySchoolInfo in : findAll) {
+				List<QmPlaySchoolClass> list = classDao.findBySchoolId(in.getSchoolId());
+				if (list.size() > 0) {
+					for (QmPlaySchoolClass cal : list) {
+						QmClockStat stat = new QmClockStat();
+						Integer countByClassId = statDao.countByClassId(cal.getClassId());
+						stat.setClassId(cal.getClassId());
+						stat.setClassCount(countByClassId);// 总人数
+						List<QmClassStudent> byClassId = classStudentDao.findByClassId(cal.getClassId());
+						int i = 0;
+						if (byClassId.size() > 0) {
+							for (QmClassStudent st : byClassId) {
+								Integer countByStudentId = statDao.countByStudentId(st.getStudentId(), date);
+								if (countByStudentId > 0) {
+									i++;
+								}
+							}
+							stat.setClockCount(i);// 实到人数
+							float size = (float) i / countByClassId;
+							DecimalFormat df = new DecimalFormat("0.0000");// 格式化小数，不足的补0
+							String filesize = df.format(size);// 返回的是String类型的
+							float parseFloat = Float.valueOf(filesize);
+							float round = (float) Math.round(parseFloat * 100);
+							stat.setClockRate(round);
+							stat.setStatDate(date);
+							stat.setPostTime(Calendar.getInstance().getTime());
+							statDao.save(stat);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public List<Object> queryStat(String date) {
+		List<Object> li = new ArrayList<>();
+		List<QmClockStat> findByStatDate = statDao.findByStatDate(date);
+		for (QmClockStat stat : findByStatDate) {
+			CountClockStatVo vo = new CountClockStatVo();
+			QmPlaySchoolClass findByClassId = classDao.findByClassId(stat.getClassId());
+			BeanUtils.copyProperties(stat, vo);
+			vo.setClassName(findByClassId.getClassName());
+			li.add(vo);
+		}
+		return li;
+	}
+
+	@Override
+	public JPADao<QmClockInfo> getDao() {
+		return infoDao;
+	}
+
+	@Override
+	public Class<QmClockInfo> getEntityClass() {
+		return QmClockInfo.class;
+	}
+}

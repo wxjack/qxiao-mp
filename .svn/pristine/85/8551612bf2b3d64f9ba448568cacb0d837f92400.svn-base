@@ -1,0 +1,19 @@
+package com.qxiao.wx.community.jpa.service;
+
+import org.json.JSONArray;
+
+import com.qxiao.wx.community.dto.QmCommunityInfoDTO;
+import com.qxiao.wx.community.jpa.entity.QmCommunityInfo;
+import com.spring.entity.DataPage;
+import com.spring.jpa.service.ServiceException;
+
+public interface IQmCommunityInfoService {
+
+	QmCommunityInfo addCommunityInfo(String openId, String textContent, JSONArray images, String video, int contentType,
+			Long classId);
+
+	DataPage<QmCommunityInfoDTO> findByClassId(String openId, Long classId, int page, int pageSize) throws ServiceException;
+
+	void deleteCommuityInfo(String openId, Long communityId) throws ServiceException;
+
+}

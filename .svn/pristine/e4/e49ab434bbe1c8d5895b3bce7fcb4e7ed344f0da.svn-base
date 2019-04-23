@@ -1,0 +1,175 @@
+package com.qxiao.wx.homework.controller;
+
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.qxiao.wx.homework.dto.QmHomeworkInfoDetailDTO;
+import com.qxiao.wx.homework.dto.QmHomeworkInfoListDTO;
+import com.qxiao.wx.homework.dto.QmHomeworkReaderDTO;
+import com.qxiao.wx.homework.jpa.service.IQmHomeworkService;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.service.IQmAccountService;
+import com.spring.web.controller.ResponseMessage;
+import com.spring.web.utils.HttpServletRequestBody;
+
+@CrossOrigin
+@RestController
+@RequestMapping(value = "action/mod-xiaojiao/homework")
+public class QmHomeworkController {
+
+	private Logger log = Logger.getLogger(QmHomeworkController.class);
+
+	@Autowired
+	private IQmAccountService accountService;
+	@Autowired
+	private IQmHomeworkService homeworkService;
+
+	@PostMapping(value = "/homeworkAdd.do", produces = "application/json;charset=utf-8")
+	public ResponseMessage homeworkAdd(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				int needConfirm = json.getInt("needConfirm");
+				JSONArray images = json.getJSONArray("images");
+				String title = json.getString("title");
+				String textContent = json.getString("textContent");
+				JSONArray senders = json.getJSONArray("senders");
+				homeworkService.homeworkAdd(openId, title, textContent, images, senders, needConfirm);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.info(e.getMessage());
+		}
+		return res;
+	}
+
+	@PostMapping(value = "/homeworkQuery.do", produces = "application/json;charset=utf-8")
+	public ResponseMessage homeworkQuery(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long classId = json.getLong("classId");
+				List<QmHomeworkInfoListDTO> dtos = homeworkService.homeworkQuery(openId, classId);
+				res.setData(dtos);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+		}
+		return res;
+	}
+
+	@PostMapping(value = "/homeworkDetail.do", produces = "application/json;charset=utf-8")
+	public ResponseMessage homeworkDetail(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long homeId = json.getLong("homeId");
+				Long classId = json.getLong("classId");
+				QmHomeworkInfoDetailDTO detailDTO = homeworkService.homeworkDetail(openId, homeId, classId);
+				res.setData(detailDTO);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+		}
+		return res;
+	}
+
+	@PostMapping(value = "/homeworkReaders.do", produces = "application/json;charset=utf-8")
+	public ResponseMessage homeworkReaders(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long homeId = json.getLong("homeId");
+				Long classId = json.getLong("classId");
+				int readFlag = json.getInt("readFlag");
+				QmHomeworkReaderDTO readers = homeworkService.homeworkReaders(openId, classId, homeId, readFlag);
+				res.setData(readers);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+		}
+		return res;
+	}
+
+	@PostMapping(value = "/homeworkDelete.do", produces = "application/json;charset=utf-8")
+	public ResponseMessage homeworkDelete(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long homeId = json.getLong("homeId");
+				homeworkService.homeworkDelete(openId, homeId);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+		}
+		return res;
+	}
+
+	@PostMapping(value = "/homeWorkConfirm.do", produces = "application/json;charset=utf-8")
+	public ResponseMessage homeWorkConfirm(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long homeId = json.getLong("homeId");
+				Long classId = json.getLong("classId");
+				homeworkService.homeWorkConfirm(openId, homeId, classId);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+		}
+		return res;
+	}
+
+}

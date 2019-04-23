@@ -1,0 +1,19 @@
+package com.qxiao.wx.community.jpa.service;
+
+import java.util.List;
+
+import org.json.JSONArray;
+
+import com.qxiao.wx.community.dto.QmCommunityInfoDTO;
+import com.qxiao.wx.community.jpa.entity.QmCommunityInfo;
+import com.spring.jpa.service.ServiceException;
+
+public interface IQmCommunityInfoService {
+
+	QmCommunityInfo addCommunityInfo(String openId, String textContent, JSONArray images, String video, int contentType, Long classId);
+
+	List<QmCommunityInfoDTO> findByClassId(String openId, Long classId) throws ServiceException;
+
+	void deleteCommuityInfo(String openId, Long communityId) throws ServiceException;
+
+}

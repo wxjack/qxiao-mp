@@ -1,0 +1,24 @@
+package com.qxiao.wx.user.jpa.service;
+
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public interface RegisterUserService {
+	
+	String diagnose(HttpServletRequest request, HttpServletResponse resopnse);
+	
+	void getOpenId1(HttpServletRequest request,HttpServletResponse response);
+	
+	void registerUser(HttpServletRequest request,HttpServletResponse response);
+	
+	Map<String, Object> userTeleLogin(String tele, String verifyCode) throws Exception;
+	
+	//void gardenLogin(String leaderName,String password) throws Exception;
+	
+	String code(String tel);
+}

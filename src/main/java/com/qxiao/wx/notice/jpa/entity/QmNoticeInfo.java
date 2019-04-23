@@ -1,0 +1,102 @@
+package com.qxiao.wx.notice.jpa.entity;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+@Entity
+public class QmNoticeInfo {
+	
+	@Id
+	@GeneratedValue
+	private Long noticeId;
+	private String title;
+	private String textContent;
+	private int isDel;
+	private String openId;
+	private int needConfirm;
+	private int messageSend;//0-未推送消息 1-已推送消息
+	private int clockType;//0-即时发送 1-定时发送
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm")
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm",timezone = "GMT+8")
+	private Date clockTime;
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss",timezone = "GMT+8")
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	private Date sendTime;
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm")
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm",timezone = "GMT+8")
+	private Date postTime;
+	
+	public Long getNoticeId() {
+		return noticeId;
+	}
+	public int getNeedConfirm() {
+		return needConfirm;
+	}
+	public void setNeedConfirm(int needConfirm) {
+		this.needConfirm = needConfirm;
+	}
+	public void setNoticeId(Long noticeId) {
+		this.noticeId = noticeId;
+	}
+	public String getTitle() {
+		return title;
+	}
+	public void setTitle(String title) {
+		this.title = title;
+	}
+	public String getTextContent() {
+		return textContent;
+	}
+	public void setTextContent(String textContent) {
+		this.textContent = textContent;
+	}
+	public int getIsDel() {
+		return isDel;
+	}
+	public void setIsDel(int isDel) {
+		this.isDel = isDel;
+	}
+	public String getOpenId() {
+		return openId;
+	}
+	public void setOpenId(String openId) {
+		this.openId = openId;
+	}
+	public int getClockType() {
+		return clockType;
+	}
+	public void setClockType(int clockType) {
+		this.clockType = clockType;
+	}
+	public Date getClockTime() {
+		return clockTime;
+	}
+	public void setClockTime(Date clockTime) {
+		this.clockTime = clockTime;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+	public int getMessageSend() {
+		return messageSend;
+	}
+	public void setMessageSend(int messageSend) {
+		this.messageSend = messageSend;
+	}
+	public Date getSendTime() {
+		return sendTime;
+	}
+	public void setSendTime(Date sendTime) {
+		this.sendTime = sendTime;
+	}
+	
+}

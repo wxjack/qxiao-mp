@@ -1,0 +1,84 @@
+package com.qxiao.wx.homework.dto;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+public class QmHomeworkInfoDetailDTO {
+
+	private Long homeId;
+    private String title;
+    private String textContent;
+    private List<Map<String, Object>> images;// {"imageUrl":"/image/1.png"},{"imageUrl":"/image/2.png"}],
+    private int confirmFlag; // 控制阅读状态
+    private int classReadCount;
+    private int classUnreadCount;
+    private int isDel;
+    private int totalCount;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss",timezone = "GMT+8")
+    private Date postTime; // 发布时间
+    
+	public int getIsDel() {
+		return isDel;
+	}
+	public void setIsDel(int isDel) {
+		this.isDel = isDel;
+	}
+	public int getTotalCount() {
+		return totalCount;
+	}
+	public void setTotalCount() {
+		this.totalCount = this.classReadCount + this.classUnreadCount;
+	}
+	public int getConfirmFlag() {
+		return confirmFlag;
+	}
+	public void setConfirmFlag(int confirmFlag) {
+		this.confirmFlag = confirmFlag;
+	}
+	public Long getHomeId() {
+		return homeId;
+	}
+	public String getTitle() {
+		return title;
+	}
+	public String getTextContent() {
+		return textContent;
+	}
+	public List<Map<String, Object>> getImages() {
+		return images;
+	}
+	public int getClassReadCount() {
+		return classReadCount;
+	}
+	public int getClassUnreadCount() {
+		return classUnreadCount;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setHomeId(Long homeId) {
+		this.homeId = homeId;
+	}
+	public void setTitle(String title) {
+		this.title = title;
+	}
+	public void setTextContent(String textContent) {
+		this.textContent = textContent;
+	}
+	public void setImages(List<Map<String, Object>> images) {
+		this.images = images;
+	}
+	public void setClassReadCount(int classReadCount) {
+		this.classReadCount = classReadCount;
+	}
+	public void setClassUnreadCount(int classUnreadCount) {
+		this.classUnreadCount = classUnreadCount;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+    
+}

@@ -1,0 +1,43 @@
+package com.qxiao.wx.user.util;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import com.qxiao.wx.user.jpa.service.PunchService;
+
+/**
+ * 基于spring的定时器任务
+ * 
+ * @author xiaojiao
+ *
+ * @创建时间：2018年11月8日
+ */
+@Component
+public class MyTask {
+
+	private Logger log = Logger.getLogger(MyTask.class);
+
+	@Autowired
+	PunchService punService;
+
+	int count = 0;
+
+	/**
+	 * 每天7点5分 -19点 每隔5分钟执行一次
+	 */
+	@Scheduled(cron = "0 00 21 ? * *")
+	public void saveClockStat() {
+		try {
+			String format = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
+			punService.saveClockStat(format);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.info("定时器异常：" + e.getMessage());
+		}
+	}
+}

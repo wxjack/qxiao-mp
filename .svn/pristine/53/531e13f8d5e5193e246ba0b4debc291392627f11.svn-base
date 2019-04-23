@@ -1,0 +1,51 @@
+package com.qxiao.wx.fresh.jpa.entity;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+@Entity
+public class QmFreshComment {
+	@Id
+	@GeneratedValue
+	private Long commentId;
+	private Long freshId;
+	private String textContent;
+	private String openId;
+	private Date postTime;
+	
+	public QmFreshComment() {}
+	
+	public String getOpenId() {
+		return openId;
+	}
+	public void setOpenId(String openId) {
+		this.openId = openId;
+	}
+	public Long getCommentId() {
+		return commentId;
+	}
+	public void setCommentId(Long commentId) {
+		this.commentId = commentId;
+	}
+	public Long getFreshId() {
+		return freshId;
+	}
+	public void setFreshId(Long freshId) {
+		this.freshId = freshId;
+	}
+	public String getTextContent() {
+		return textContent;
+	}
+	public void setTextContent(String textContent) {
+		this.textContent = textContent;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+	
+}

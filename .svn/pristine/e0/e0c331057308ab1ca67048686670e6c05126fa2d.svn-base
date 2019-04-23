@@ -1,0 +1,20 @@
+package com.qxiao.wx.notice.jpa.dao;
+
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.notice.jpa.entity.QmNoticeInfo;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmNoticeInfoDao extends JPADao<QmNoticeInfo> {
+
+	@Query(nativeQuery = true, value = "SELECT qni.* FROM qm_notice_info AS qni "
+			+ "JOIN qm_notice_sender AS qns ON qni.notice_id = qns.notice_id "
+			+ "WHERE qni.notice_id = ?1 AND qns.sender_id = ?2 AND qns.sender_type = ?3 GROUP BY qni.notice_id")
+	QmNoticeInfo findByNoticeIdAndClassIdAndSendType(Long noticeId, Long classId, int senderType);
+
+	List<QmNoticeInfo> findByClockTime(Date date);
+
+}

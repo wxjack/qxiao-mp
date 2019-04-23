@@ -1,0 +1,270 @@
+package com.qxiao.wx.user.jpa.service.impl;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.community.jpa.dao.QmClassTeacherDao;
+import com.qxiao.wx.user.jpa.dao.QmAccountDao;
+import com.qxiao.wx.user.jpa.dao.QmLeaderInitDao;
+import com.qxiao.wx.user.jpa.dao.QmPatriarchDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolClassDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolTeacherDao;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.dao.QmTeleVerifyCodeDao;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.entity.QmLeaderInit;
+import com.qxiao.wx.user.jpa.entity.QmPatriarch;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolTeacher;
+import com.qxiao.wx.user.jpa.entity.QmTeleVerifyCode;
+import com.qxiao.wx.user.jpa.service.RegisterUserService;
+import com.qxiao.wx.user.jpa.service.SchoolClassService;
+import com.qxiao.wx.user.session.SessionList;
+import com.qxiao.wx.user.util.VeriftCode;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.talkweb.weixin.main.StartOnLoad;
+import com.talkweb.weixin.pojo.AccessToken;
+import com.talkweb.weixin.util.WeiXinUtil;
+
+import net.sf.json.JSONObject;
+
+@Service
+public class RegisterUserServiceImpl extends AbstractJdbcService<QmAccount> implements RegisterUserService {
+
+	@Autowired
+	QmAccountDao accountDao;
+	@Autowired
+	QmLeaderInitDao leaderInitDao;
+	@Autowired
+	QmPlaySchoolTeacherDao teacherDao;
+	@Autowired
+	QmStudentDao studentDao;
+	@Autowired
+	QmPatriarchDao patriarchDao;
+	@Autowired
+	QmTeleVerifyCodeDao codeDao;
+	@Autowired
+	QmPlaySchoolInfoDao schoolInfoDao;
+	@Autowired
+	QmClassTeacherDao classTeacherDao;
+	@Autowired
+	QmPlaySchoolClassDao schoolClassDao;
+	@Autowired
+	SchoolClassService classService;
+	@Autowired
+	QmPlaySchoolClassDao classDao;
+
+	public void getOpenId1(HttpServletRequest request, HttpServletResponse response) {
+		// 为了获取openId,必先获取到CODE
+		// return CoreService.processRequest(request, response);
+		String openId = "";
+		String code = request.getParameter("code");
+		if ((code != null) && (!code.equals(""))) {
+			System.out.println("CODE=" + code);
+			// 此次去获取OpenId
+			JSONObject jsonObject = WeiXinUtil.getUserInfoOpenId(StartOnLoad.TOKEN_APPID, StartOnLoad.TOKEN_SECRET,
+					code);
+			try {
+				openId = jsonObject.getString("openid");
+				AccessToken accessToken =StartOnLoad.tokenThread1.accessToken;
+				JSONObject object = WeiXinUtil.getWxUserInfo(accessToken.getToken(), openId);
+				QmAccount findByOpenId = accountDao.findByOpenId(openId);
+				if (findByOpenId == null) {
+					QmAccount qm = new QmAccount();
+					if (object.get("country") != null && object.get("province") != null && object.get("city") != null) {
+						qm.setLocation(
+								object.getString("country") + object.getString("province") + object.getString("city"));
+					}
+					qm.setOpenId(openId);
+					if (object.get("headimgurl") != null) {
+						qm.setPhoto(object.getString("headimgurl"));
+					}
+					if (object.get("sex") != null) {
+						qm.setSex(object.getInt("sex"));
+					}
+					if (object.get("nickname") != null) {
+						qm.setuName(object.getString("nickname"));
+					}
+					qm.setPersonType(9);
+					qm.setPostTime(Calendar.getInstance().getTime());
+					findByOpenId = accountDao.save(qm);
+//					response.sendRedirect(UserEnum.SENDREDIRECT+"/#/author?openId=" + openId+"&photo="+qm.getPhoto());
+				}
+				
+				if (findByOpenId.getPersonType() == 9) {
+					response.sendRedirect(StartOnLoad.GOAL_LOCAL_URL+"#/login?openId=" + openId + "&photo=" + findByOpenId.getPhoto());
+				} 
+				String classId=null;
+				if(findByOpenId.getPersonType() == 0){
+					List<Map<String, Object>> queryClassBySchool = classService.queryClassBySchool(findByOpenId.getRoleId());					
+					if(queryClassBySchool.size()>0) {
+						classId= queryClassBySchool.get(0).get("classId").toString();
+					}
+					response.sendRedirect(StartOnLoad.GOAL_LOCAL_URL+"#/home?openId=" + openId + "&roleType=" + 1+"&photo="+findByOpenId.getPhoto()
+							+ "&id=" + findByOpenId.getRoleId()+"&classId="+classId);
+				}
+				if(findByOpenId.getPersonType()==1) {
+					Long schoolId = teacherDao.findSchoolId(openId);
+					List<Map<String, Object>> queryClassBySchool = classService.queryClassBySchool(schoolId);					
+					if(queryClassBySchool.size()>0) {
+						classId= queryClassBySchool.get(0).get("classId").toString();
+					}
+					response.sendRedirect(StartOnLoad.GOAL_LOCAL_URL+"#/home?openId=" + openId + "&roleType=" + 1+"&photo="+findByOpenId.getPhoto()
+							+ "&id=" + schoolId+"&classId="+classId);
+				}
+//				else {
+//					response.sendRedirect(StartOnLoad.GOAL_LOCAL_URL+"#/home?openId=" + openId + "&roleType=" + findByOpenId.getPersonType()+"&photo="+findByOpenId.getPhoto()
+//					+ "&id=" + findByOpenId.getRoleId());
+//				}
+				if(findByOpenId.getPersonType() == 2) {
+					List<QmPlaySchoolClass> teacher = classDao.findWithTeacher(openId);
+					response.sendRedirect(StartOnLoad.GOAL_LOCAL_URL+"#/home?openId=" + openId + "&roleType=" + findByOpenId.getPersonType()+"&photo="+findByOpenId.getPhoto()
+					+ "&id=" + findByOpenId.getRoleId()+"&classId="+teacher.get(0).getClassId());
+		
+				}
+				if(findByOpenId.getPersonType() == 3) {
+					List<QmPlaySchoolClass> stduent = classDao.findWithPatriarch(openId);
+					response.sendRedirect(StartOnLoad.GOAL_LOCAL_URL+"#/home?openId=" + openId + "&roleType=" + findByOpenId.getPersonType()+"&photo="+findByOpenId.getPhoto()
+							+ "&id=" + findByOpenId.getRoleId()+"&classId="+stduent.get(0).getClassId());
+				}
+
+				System.out.println("openId=" + openId);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public void registerUser(HttpServletRequest request, HttpServletResponse response) {
+		// 获取code
+		WeiXinUtil.getFuwuCode(response, StartOnLoad.TOKEN_APPID,
+				StartOnLoad.GOAL_URL + "action/mod-xiaojiao/manage/getOpenId.do");
+
+	}
+
+	public Map<String, Object> userTeleLogin(String tele, String verifyCode) throws Exception {
+		QmLeaderInit leader = leaderInitDao.findByTel(tele);
+		List<QmTeleVerifyCode> findList = codeDao.findByTel(tele);
+		Map<String, Object> map = new HashMap<>();
+		if (!findList.get(0).getVeriftCode().equals(verifyCode)) {
+			throw new Exception("验证码错误");// 验证码错误
+		}
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		String format = sdf.format(findList.get(0).getPostTime());
+		long time = sdf.parse(format).getTime();// 生成时间
+		long millis = Calendar.getInstance().getTimeInMillis();
+		if (millis - time > 300000) {
+			throw new Exception("验证码过期");// 验证码过期
+		}
+
+		if (leader != null && verifyCode.trim().equals(findList.get(0).getVeriftCode())) {
+			QmPlaySchoolInfo schoolInfo = schoolInfoDao.findByTel(tele);
+			if (schoolInfo == null) {
+				map.put("roleType", 4);
+				map.put("openId", "");
+				map.put("schoolId", 0);
+				map.put("tel", tele);
+				return map;// 进入注册幼儿园信息界面
+			}
+			map.put("roleType", 1);
+			map.put("openId", schoolInfo.getOpenId());
+			map.put("schoolId", schoolInfo.getSchoolId());
+			map.put("tel", tele);
+			return map;// 园长-直接首页
+		}
+		QmPlaySchoolTeacher teacher = teacherDao.findByTel(tele);
+		if (teacher != null && verifyCode.trim().equals(findList.get(0).getVeriftCode())) {
+
+			if (teacher.getOpenId() == null || teacher.getOpenId().equals("")) {
+				map.put("roleType", 5);
+				map.put("openId", "");
+				map.put("teacherId", teacher.getTeacherId());
+				map.put("tel", tele);
+				return map;
+			}
+			if (teacher.getType() == 0) {
+				QmPlaySchoolInfo info = schoolInfoDao.findWithTeacher(teacher.getOpenId());
+				map.put("roleType", 1);
+				map.put("openId", teacher.getOpenId());
+				map.put("schoolId", info.getSchoolId());
+				map.put("tel", tele);
+				return map;
+			}
+			map.put("roleType", 2);
+			map.put("openId", teacher.getOpenId());
+			map.put("teacherId", teacher.getTeacherId());
+			map.put("tel", tele);
+			return map;// 老师
+		}
+		QmPatriarch patroarch = patriarchDao.findByTel(tele);
+		if (patroarch != null && verifyCode.trim().equals(findList.get(0).getVeriftCode())) {
+			if (patroarch.getOpenId() == null || patroarch.getOpenId().equals("")) {
+				map.put("roleType", 6);
+				map.put("openId", "");
+				map.put("patroarchId", patroarch.getId());
+				map.put("tel", tele);
+				return map;
+			}
+			SessionList.setSeesion(patroarch.getOpenId());
+			SessionList.setSeesion(SessionList.ROLETYPE, 3, patroarch.getOpenId());
+			map.put("roleType", 3);
+			map.put("openId", patroarch.getOpenId());
+			map.put("patroarchId", patroarch.getId());
+			map.put("tel", tele);
+			return map;// 家长
+		}
+		map.put("roleType", 0);
+		map.put("openId", "");
+		map.put("id", 0);
+		map.put("tel", tele);
+		return map;// 未关联
+
+	}
+
+//	public void gardenLogin(String leaderName,String password) throws Exception {
+//		QmPlaySchoolInfo findByleaderName = schoolInfoDao.findByleaderName(leaderName);
+//		if(findByleaderName==null) {
+//			throw new Exception("用户名或密码错误");
+//		}
+//		JSONObject jsonObject = PasswordHelper.encryptPassword(leaderName, password);
+//		password = (String) jsonObject.get("password");
+//		if(!password.trim().equals(findByleaderName.getPassword())) {
+//			throw new Exception("用户名或密码错误");
+//		}
+//		
+//	}
+
+	public String code(String tel) {
+		String veriftCode = VeriftCode.veriftCode();
+		QmTeleVerifyCode code = new QmTeleVerifyCode();
+		code.setTel(tel);
+		code.setVeriftCode(veriftCode);
+		code.setPostTime(Calendar.getInstance().getTime());
+		codeDao.save(code);
+		return veriftCode;
+
+	}
+
+	@Override
+	public JPADao<QmAccount> getDao() {
+		return accountDao;
+	}
+
+	@Override
+	public Class<QmAccount> getEntityClass() {
+		return QmAccount.class;
+	}
+
+}

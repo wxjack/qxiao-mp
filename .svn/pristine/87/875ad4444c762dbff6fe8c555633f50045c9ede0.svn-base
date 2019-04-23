@@ -1,0 +1,8 @@
+package com.qxiao.wx.user.userenum;
+
+public class UserEnum {
+
+	public static final String REDIRECTURL="http://23ti245684.imwork.net";
+	//public static final String REDIRECTURL="http://zh.qxiao.net";
+	public static final String SENDREDIRECT="http://232a9x6385.51mypc.cn";
+}

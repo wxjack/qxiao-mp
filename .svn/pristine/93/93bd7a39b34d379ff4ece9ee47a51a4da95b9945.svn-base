@@ -1,0 +1,62 @@
+package com.qxiao.wx.componse;
+
+/**
+ * 根据OpenId获取用户的账户信息（用户名，账户类型）
+ * @author xiaojiao
+ *
+ * @创建时间：2018年12月28日
+ */
+public class UserInfo {
+	
+	private String openId;
+	private String username;// 用户名
+	private Long schoolId;
+	private String schoolName;
+	private String photo;
+	private int relation;
+	private int type;// 账户类型
+
+	public int getRelation() {
+		return relation;
+	}
+	public void setRelation(int relation) {
+		this.relation = relation;
+	}
+	public String getPhoto() {
+		return photo;
+	}
+	public void setPhoto(String photo) {
+		this.photo = photo;
+	}
+	public String getSchoolName() {
+		return schoolName;
+	}
+	public void setSchoolName(String schoolName) {
+		this.schoolName = schoolName;
+	}
+	public String getOpenId() {
+		return openId;
+	}
+	public String getUsername() {
+		return username;
+	}
+	public Long getSchoolId() {
+		return schoolId;
+	}
+	public int getType() {
+		return type;
+	}
+	public void setOpenId(String openId) {
+		this.openId = openId;
+	}
+	public void setUsername(String username) {
+		this.username = username;
+	}
+	public void setSchoolId(Long schoolId) {
+		this.schoolId = schoolId;
+	}
+	public void setType(int type) {
+		this.type = type;
+	}
+	
+}

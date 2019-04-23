@@ -1,0 +1,37 @@
+package com.qxiao.wx.user.vo;
+
+public class ClockStatVo {
+
+	private int classCount;
+	private Long studentId;
+	private String date;
+	private Long classId;
+	
+	
+	public Long getStudentId() {
+		return studentId;
+	}
+	public void setStudentId(Long studentId) {
+		this.studentId = studentId;
+	}
+	public int getClassCount() {
+		return classCount;
+	}
+	public void setClassCount(int classCount) {
+		this.classCount = classCount;
+	}
+	public String getDate() {
+		return date;
+	}
+	public void setDate(String date) {
+		this.date = date;
+	}
+	public Long getClassId() {
+		return classId;
+	}
+	public void setClassId(Long classId) {
+		this.classId = classId;
+	}
+	
+	
+}

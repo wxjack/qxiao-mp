@@ -1,0 +1,37 @@
+package com.qxiao.wx.notice.dto;
+
+import java.util.Date;
+import java.util.List;
+
+public class QmNoticeInfoReadDTO {
+
+	private Long noticeId;
+	private String title;
+	private Date postTime;
+	private List<QmNoticeReadDTO> readers;
+	
+	public Long getNoticeId() {
+		return noticeId;
+	}
+	public String getTitle() {
+		return title;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public List<QmNoticeReadDTO> getReaders() {
+		return readers;
+	}
+	public void setNoticeId(Long noticeId) {
+		this.noticeId = noticeId;
+	}
+	public void setTitle(String title) {
+		this.title = title;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+	public void setReaders(List<QmNoticeReadDTO> readers) {
+		this.readers = readers;
+	}
+}

@@ -1,0 +1,25 @@
+package com.qxiao.wx.user.jpa.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.user.jpa.entity.QmPatriarch;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmPatriarchDao extends JPADao<QmPatriarch> {
+
+	QmPatriarch findByTel(String tel);
+
+	QmPatriarch findByOpenId(String openId);
+
+	@Query(nativeQuery = true, value = "SELECT	qp.* FROM  qm_patriarch AS qp "
+			+ "JOIN qm_patriarch_student AS qps ON qp.id = qps.patriarch_id "
+			+ "JOIN qm_class_student AS qcs ON qcs.student_id = qps.student_id where qcs.class_id = ?1")
+	List<QmPatriarch> findByClassId(Long classId);
+
+	@Query(nativeQuery = true,value="SELECT qp.* FROM qm_student as qs JOIN qm_patriarch_student as qps JOIN qm_patriarch as qp " + 
+			"where qs.student_id=qps.student_id and qps.patriarch_id=qp.id and (qs.ibeacon_id=?1 or qs.nfc_id=?2)")
+	List<QmPatriarch> findBynfcIdOrIbeaconId(String nfcId, String ibeaconId);
+
+}

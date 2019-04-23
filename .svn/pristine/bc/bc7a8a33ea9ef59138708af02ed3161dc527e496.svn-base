@@ -1,0 +1,100 @@
+package com.qxiao.wx.user.jpa.service;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.vo.ClassStudentVo;
+import com.qxiao.wx.user.vo.ClassTeacherVo;
+
+@Service
+public interface SchoolClassService {
+	
+	
+	List<QmPlaySchoolClass> queryClassByTel(String tel);
+	/**
+	 * 查询家长所关联学生的班级
+	 * @param id
+	 * @return
+	 */
+	List<Map<String, Object>> queryClassByPatroarch(Long id);
+	/**
+	 * 查询学校所有班级（id跟名称）
+	 * @param schoolId
+	 * @return
+	 */
+	List<Map<String, Object>> queryClassBySchool(Long schoolId);
+	/**
+	 * 查询老师所带的班级
+	 * @param teacherId
+	 * @return
+	 */
+	List<Map<String, Object>> queryClassByTeacher(Long teacherId);
+	/**
+	 * 添加班级
+	 * 
+	 * @param openId
+	 * @param schoolId
+	 * @param className
+	 */
+	void classAdd(String openId, Long schoolId, String className);
+
+	/**
+	 * 删除班级
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @throws Exception
+	 */
+	void deleteSchoolClass(String openId, Long classId) throws Exception;
+
+	/**
+	 * 查询班级老师列表
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @return
+	 */
+	List<ClassTeacherVo> queryTeacher(String openId, Long classId);
+
+	/**
+	 * 删除班级老师
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @param teacherId
+	 */
+	void deleteTeacher(String openId, Long classId, Long teacherId);
+
+	/**
+	 * 查询班级学生
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @return
+	 */
+	List<ClassStudentVo> queryStudent(String openId, Long classId);
+
+	/**
+	 * 删除班级学生
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @param studentId
+	 */
+	void deleteStudent(String openId, Long classId, Long studentId);
+
+	/**
+	 * 查询班级列表
+	 * 
+	 * @param schoolId
+	 * @return
+	 */
+	List<Object> queryClass(Long schoolId);
+
+	List<QmPlaySchoolClass> queryClassinfo(Long schoolId);
+
+	QmPlaySchoolClass queryClassById(Long classId);
+}

@@ -1,0 +1,70 @@
+package com.qxiao.wx.user.jpa.entity;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+@Entity
+public class QmClockInfo {
+	@Id
+	@GeneratedValue
+	private Long clockId;
+	private String nfcId;
+	private String ibeaconId;
+	private int type;
+	private int messageSend;
+	private Date sendTime;
+	private Date postTime;
+	private int broadcast;
+	
+	public int getBroadcast() {
+		return broadcast;
+	}
+	public void setBroadcast(int broadcast) {
+		this.broadcast = broadcast;
+	}
+	public Long getClockId() {
+		return clockId;
+	}
+	public void setClockId(Long clockId) {
+		this.clockId = clockId;
+	}
+	public String getNfcId() {
+		return nfcId;
+	}
+	public void setNfcId(String nfcId) {
+		this.nfcId = nfcId;
+	}
+	public String getIbeaconId() {
+		return ibeaconId;
+	}
+	public void setIbeaconId(String ibeaconId) {
+		this.ibeaconId = ibeaconId;
+	}
+	public int getType() {
+		return type;
+	}
+	public void setType(int type) {
+		this.type = type;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+	public int getMessageSend() {
+		return messageSend;
+	}
+	public void setMessageSend(int messageSend) {
+		this.messageSend = messageSend;
+	}
+	public Date getSendTime() {
+		return sendTime;
+	}
+	public void setSendTime(Date sendTime) {
+		this.sendTime = sendTime;
+	}
+	
+}

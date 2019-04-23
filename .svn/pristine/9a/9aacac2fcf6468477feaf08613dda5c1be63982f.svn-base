@@ -1,0 +1,18 @@
+package com.qxiao.wx.fresh.jpa.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.fresh.jpa.entity.QmFreshRead;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmFreshReadDao extends JPADao<QmFreshRead> {
+
+	@Query(value = "SELECT qfr.* from qm_fresh_read AS qfr JOIN qm_fresh_info AS qfi ON qfi.fresh_id = qfr.fresh_id "
+			+ "JOIN qm_fresh_sender AS qfs ON qfs.fresh_id = qfi.fresh_id WHERE qfr.fresh_id = ?1 AND qfs.class_id = ?2", nativeQuery = true)
+	List<QmFreshRead> findByFreshIdAndClassId(Long freshId, Long classId);
+
+	QmFreshRead findByStudentId(Long studentId);
+
+}

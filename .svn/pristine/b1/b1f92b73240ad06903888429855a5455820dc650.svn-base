@@ -1,0 +1,300 @@
+package com.qxiao.wx.user.controller;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.jpa.service.SchoolClassService;
+import com.qxiao.wx.user.vo.ClassAddVo;
+import com.qxiao.wx.user.vo.ClassStudentVo;
+import com.qxiao.wx.user.vo.ClassTeacherVo;
+import com.spring.web.controller.ResponseMessage;
+import com.spring.web.utils.HttpServletRequestBody;
+
+@CrossOrigin
+@Controller
+@RequestMapping("/action/mod-xiaojiao/manage")
+public class SchoolClassController {
+
+	@Autowired
+	SchoolClassService classService;
+
+	/**
+	 * 查询id所在班级
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/queryClassId.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage queryClassId(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject object = HttpServletRequestBody.toJSONObject(request);
+			String roleType = object.get("roleType").toString();
+			String id = object.get("id").toString();
+			List<Object> classes = new ArrayList<>();
+			if (roleType.trim().equals("2") || roleType.trim().equals("5")) {// 教师登录
+				classes = classService.queryClassByTeacher(Long.valueOf(id));
+			}
+			if (roleType.trim().equals("1") || roleType.trim().equals("4")) {
+				classes = classService.queryClassBySchool(Long.valueOf(id));
+			}
+			if (roleType.trim().equals("3") || roleType.trim().equals("6")) {
+				classes = classService.queryClassByPatroarch(Long.valueOf(id));
+			}
+			rm.setData(classes);
+		} catch (Exception e) {
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+			e.printStackTrace();
+		}
+		return rm;
+	}
+
+	/**
+	 * 添加班级
+	 * 
+	 * @param request
+	 * @param res
+	 * @return
+	 */
+	@RequestMapping(value = "/classAdd.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage addClass(HttpServletRequest request, HttpServletResponse res) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			String string = HttpServletRequestBody.toJSONObject(request).toString();
+			ObjectMapper mapper = new ObjectMapper();
+			ClassAddVo value = mapper.readValue(string, ClassAddVo.class);
+			classService.classAdd(value.getOpenId(), value.getSchoolId(), value.getClassName());
+		} catch (JSONException e) {
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+		}
+		return rm;
+	}
+
+	/**
+	 * 删除班级
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @return
+	 */
+	@RequestMapping(value = "/classDelete.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage deleteClass(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject jsonObject = HttpServletRequestBody.toJSONObject(request);
+			String openId = jsonObject.get("openId").toString();
+			String classId = jsonObject.get("classId").toString();
+			classService.deleteSchoolClass(openId, Long.valueOf(classId));
+		} catch (Exception e) {
+			e.printStackTrace();
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+		}
+		return rm;
+	}
+
+	/**
+	 * 查询班级老师
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @return
+	 */
+	@RequestMapping(value = "/classQueryTeacher.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage queryTeacher(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject jsonObject = HttpServletRequestBody.toJSONObject(request);
+			String openId = jsonObject.get("openId").toString();
+			String classId = jsonObject.get("classId").toString();
+			List<ClassTeacherVo> queryTeacher = classService.queryTeacher(openId, Long.valueOf(classId));
+			Map<String, Object> map = new HashMap<>();
+			map.put("teacher", queryTeacher);
+			map.put("className", classService.queryClassById(Long.valueOf(classId)).getClassName());
+
+			rm.setData(map);
+		} catch (Exception e) {
+			e.printStackTrace();
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+		}
+		return rm;
+	}
+
+	/**
+	 * 移除班级老师
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @param teacherId
+	 * @return
+	 */
+	@RequestMapping(value = "/classMoveTeacher.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage deleteTeacher(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject jsonObject = HttpServletRequestBody.toJSONObject(request);
+			String openId = jsonObject.get("openId").toString();
+			String classId = jsonObject.get("classId").toString();
+			String teacherId = jsonObject.get("teacherId").toString();
+			classService.deleteTeacher(openId, Long.valueOf(classId), Long.valueOf(teacherId));
+		} catch (Exception e) {
+			e.printStackTrace();
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+		}
+		return rm;
+	}
+
+	/**
+	 * 查询班级学生
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @return
+	 */
+	@RequestMapping(value = "/classQueryStudent.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage queryStudent(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject jsonObject = HttpServletRequestBody.toJSONObject(request);
+			String openId = jsonObject.get("openId").toString();
+			String classId = jsonObject.get("classId").toString();
+			List<ClassStudentVo> queryStudent = classService.queryStudent(openId, Long.valueOf(classId));
+			Map<String, Object> map = new HashMap<>();
+			map.put("student", queryStudent);
+			map.put("className", classService.queryClassById(Long.valueOf(classId)).getClassName());
+			rm.setData(map);
+		} catch (Exception e) {
+			e.printStackTrace();
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+		}
+		return rm;
+	}
+
+	/**
+	 * 移除班级学生
+	 * 
+	 * @param openId
+	 * @param classId
+	 * @param studentId
+	 * @return
+	 */
+	@RequestMapping(value = "/classMoveStudent.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage deleteStudent(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject jsonObject = HttpServletRequestBody.toJSONObject(request);
+			String openId = jsonObject.get("openId").toString();
+			String classId = jsonObject.get("classId").toString();
+			String studentId = jsonObject.get("studentId").toString();
+			classService.deleteStudent(openId, Long.valueOf(classId), Long.valueOf(studentId));
+		} catch (Exception e) {
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+			e.printStackTrace();
+		}
+		return rm;
+
+	}
+
+	/**
+	 * 查询学校班级列表
+	 * 
+	 * @param request
+	 * @param res
+	 * @return
+	 */
+	@RequestMapping(value = "/queryClass.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage queryClass(HttpServletRequest request, HttpServletResponse res) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject jsonObject = HttpServletRequestBody.toJSONObject(request);
+			String schoolId = jsonObject.get("schoolId").toString();
+			List<Object> queryClass = new ArrayList<>();
+			if (StringUtils.isNotBlank(schoolId)) {
+				queryClass = classService.queryClass(Long.valueOf(schoolId));
+			}
+			rm.setData(queryClass);
+		} catch (Exception e) {
+			e.printStackTrace();
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+		}
+		return rm;
+	}
+
+	/**
+	 * 查询学校班级
+	 * 
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/queryClassInfo.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage queryClassInfo(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject object = HttpServletRequestBody.toJSONObject(request);
+			String schoolId = object.get("schoolId").toString();
+			List<QmPlaySchoolClass> classinfo = classService.queryClassinfo(Long.valueOf(schoolId));
+			rm.setData(classinfo);
+		} catch (Exception e) {
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+			e.printStackTrace();
+		}
+		return rm;
+	}
+
+	@RequestMapping(value = "/queryClassByTel.do", method = RequestMethod.POST)
+	@ResponseBody
+	public ResponseMessage queryClassByTel(HttpServletRequest request) {
+		ResponseMessage rm = new ResponseMessage();
+		try {
+			JSONObject object = HttpServletRequestBody.toJSONObject(request);
+			String tel = object.get("tel").toString();
+			List<QmPlaySchoolClass> queryClassByTel = classService.queryClassByTel(tel);
+			rm.setData(queryClassByTel);
+		} catch (Exception e) {
+			rm.setErrorCode(-1);
+			rm.setErrorMsg(e.getMessage());
+			e.printStackTrace();
+		}
+		return rm;
+	}
+}

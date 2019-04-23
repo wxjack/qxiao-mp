@@ -1,0 +1,25 @@
+package com.qxiao.wx.fresh.jpa.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.fresh.jpa.entity.QmFreshComment;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmFreshCommentDao extends JPADao<QmFreshComment> {
+
+	@Query(value = "SELECT qfc.* from qm_fresh_comment AS qfc JOIN qm_fresh_info AS qfi ON qfi.fresh_id = qfc.fresh_id "
+			+ "JOIN qm_fresh_sender AS qfs ON qfs.fresh_id = qfi.fresh_id WHERE qfc.fresh_id = ?1 AND qfs.class_id = ?2", nativeQuery = true)
+	List<QmFreshComment> findByFreshIdAndClassId(Long freshId, Long classId);
+
+	@Modifying
+	@Query(value = "delete from QmFreshComment q where q.commentId = ?1 and q.openId = ?2")
+	void deleteComment(Long commentId, String openId);
+
+	@Modifying
+	@Query(value ="delete from QmFreshComment q where q.freshId = ?1")
+	void deleteByFreshId(long freshId);
+
+}

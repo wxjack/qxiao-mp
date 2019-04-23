@@ -1,0 +1,97 @@
+package com.qxiao.wx.fresh.jpa.service.impl;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.fresh.dto.QmFreshCommentDTO;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshCommentDao;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshInfoDao;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshComment;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshInfo;
+import com.qxiao.wx.fresh.jpa.service.IQmFreshCommentService;
+import com.qxiao.wx.fresh.vo.QmCommentInfoVO;
+import com.qxiao.wx.fresh.vo.QmFreshCommentStuVO;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@Service
+public class QmFreshCommentServiceImpl extends AbstractJdbcService<QmFreshComment> implements IQmFreshCommentService {
+
+	@Autowired
+	private QmFreshCommentDao commentDao;
+	@Autowired
+	private QmFreshInfoDao freshDao;
+	@Autowired
+	private QmStudentDao studentDao;
+
+	@Override
+	public JPADao<QmFreshComment> getDao() {
+		return this.commentDao;
+	}
+
+	@Override
+	public Class<QmFreshComment> getEntityClass() {
+		return QmFreshComment.class;
+	}
+
+	@Override
+	@Transactional
+	// 留言
+	public void addComment(String openId, String textContent, Long freshId, Long studentId) throws ServiceException {
+		QmFreshComment comment = new QmFreshComment();
+		QmStudent student = studentDao.findByOpenId(openId);
+		if (student == null) {
+			throw new ServiceException("未绑定学生信息！");
+		}
+		comment.setFreshId(freshId);
+		comment.setTextContent(textContent);
+		comment.setOpenId(openId);
+		comment.setPostTime(new Date());
+		commentDao.save(comment);
+	}
+
+	@Override
+	// 速报列表查询
+	public QmFreshCommentDTO findFreshComment(Long freshId, Long classId)
+			throws IllegalAccessException, InvocationTargetException {
+
+		QmFreshInfo freshInfo = freshDao.findOne(freshId);
+		QmFreshCommentDTO commentDTO = new QmFreshCommentDTO();
+		commentDTO.setFreshId(freshInfo.getFreshId());
+		commentDTO.setTitle(freshInfo.getTitle());
+		commentDTO.setPostTime(freshInfo.getPostTime());
+		List<QmFreshComment> comments = commentDao.findByFreshIdAndClassId(freshId, classId);
+		List<QmCommentInfoVO> infoVOs = new ArrayList<>();
+		for (QmFreshComment comment : comments) {
+			QmCommentInfoVO infoVO = new QmCommentInfoVO();
+			QmFreshCommentStuVO commentVO = this.findCommentVo(comment.getOpenId());
+			infoVO.setCommentId(comment.getCommentId());
+			infoVO.setName(commentVO.getName());
+			infoVO.setRelation(commentVO.getRelation());
+			infoVO.setPostTime(comment.getPostTime());
+			infoVOs.add(infoVO);
+		}
+		commentDTO.setContents(infoVOs);
+		return commentDTO;
+	}
+
+	@SuppressWarnings("unchecked")
+	private QmFreshCommentStuVO findCommentVo(String openId) {
+		String sql = "SELECT qs.student_name AS name, qp.relation AS relation "
+				+ "FROM qm_student AS qs JOIN qm_patriarch_student AS qps ON qs.student_id = qps.student_id "
+				+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id WHERE qp.open_id = ? ";
+		List<QmFreshCommentStuVO> findList = (List<QmFreshCommentStuVO>) super.findList(sql, new Object[] { openId }, QmFreshCommentStuVO.class);
+		return findList.get(0);
+	}
+
+}

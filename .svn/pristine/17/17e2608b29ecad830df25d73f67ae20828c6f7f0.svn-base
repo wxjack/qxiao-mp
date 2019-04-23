@@ -1,0 +1,65 @@
+package com.qxiao.wx.common;
+
+import org.springframework.util.StringUtils;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qxiao.wx.fresh.vo.QmImage;
+
+public class JsonMapper {
+
+	private static ObjectMapper mapper = new ObjectMapper();
+
+	private JsonMapper() {
+	}
+
+	/**
+	 * 获取mapper对象
+	 * 
+	 * @return
+	 */
+	public static ObjectMapper getMapper() {
+		return mapper;
+	}
+
+	/**
+	 * 转String
+	 * 
+	 * @param object
+	 * @return
+	 */
+	public static String obj2String(Object object) {
+		try {
+			if (StringUtils.isEmpty(object)) {
+				return null;
+			}
+			return getMapper().writeValueAsString(object);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	/**
+	 * 转具体实例
+	 * 
+	 * @param src
+	 * @param clazz
+	 * @return
+	 */
+	public static <T> T obj2Instance(String str, Class<T> clazz) {
+		try {
+			if (StringUtils.isEmpty(str)) {
+				return null;
+			}
+			return getMapper().readValue(str, clazz);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	public static void main(String[] args) throws Exception {
+		QmImage image = new QmImage();
+		System.out.println(image);
+	}
+}

@@ -1,0 +1,11 @@
+token.appId=wx3685a85741d11f3b
+token.secret=ba1f387a581a5e9f2c96bdd7b26feb28
+#token.appId=wx95d24b4a872924df
+#token.secret=d1f992d25030be93b430e126e6813e29
+token=1234567890
+localURL=http\://mp.huoler.com/
+goalLocalUrl=http\://ding.huoler.com\:8090/jxFood/
+goalURL=http\://ding.huoler.com\:8010/Order/order/
+wsURL=124.172.237.112\:8082
+picURL=http\://ding.huoler.com\:8010/Order/
+isCreateMenu=false

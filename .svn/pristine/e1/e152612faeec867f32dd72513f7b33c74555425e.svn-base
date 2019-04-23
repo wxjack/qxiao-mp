@@ -1,0 +1,8 @@
+package com.qxiao.wx.fresh.jpa.dao;
+
+import com.qxiao.wx.fresh.jpa.entity.QmFreshSender;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmFreshSenderDao extends JPADao<QmFreshSender>{
+
+}

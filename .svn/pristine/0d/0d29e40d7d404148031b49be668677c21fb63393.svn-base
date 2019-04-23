@@ -1,0 +1,31 @@
+package com.qxiao.wx.user.jpa.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmStudentDao extends JPADao<QmStudent>{
+
+	@Query("SELECT COUNT(*) FROM QmStudent as qs , QmClockInfo as qci " + 
+			"where (qci.ibeaconId=qs.ibeaconId or qci.nfcId=qs.nfcId) " + 
+			"and qs.studentId=?1 and DATE_FORMAT(qci.postTime,'%Y-%m-%d')=?2")
+	Integer findByStudentId(Long studentId,String postTime);
+	
+	@Query(nativeQuery = true, value = "SELECT qs.student_id AS studentId FROM qm_student AS qs "
+			+ "JOIN qm_class_student AS qcs ON qcs.student_id = qs.student_id "
+			+ "JOIN qm_patriarch_student AS qps ON qps.student_id = qs.student_id "
+			+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id WHERE "
+			+ "qp.open_id = ?1 AND qcs.class_id = ?2 GROUP BY qcs.student_id")
+	List<QmStudent> findByOpenIdAndClassId(String openId, Long classId);
+
+	@Query(value = "SELECT qs.* FROM qm_student AS qs JOIN qm_patriarch_student AS qps "
+			+ "ON qs.student_id = qps.student_id JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id "
+			+ "WHERE qp.open_id = ? GROUP BY qs.student_id", nativeQuery = true)
+	QmStudent findByOpenId(String openId);
+
+	QmStudent findByStudentId(Long studentId);
+	
+}

@@ -1,0 +1,49 @@
+package com.qxiao.wx.user.vo;
+
+public class ClassClockQueryVo {
+
+	private Long studentId;
+	private String studentName;
+	private Integer clockFlag;
+	private Long clockId;
+	private Integer broadcast;
+	private String postTime;
+	
+	public Long getClockId() {
+		return clockId;
+	}
+	public void setClockId(Long clockId) {
+		this.clockId = clockId;
+	}
+	public Long getStudentId() {
+		return studentId;
+	}
+	public void setStudentId(Long studentId) {
+		this.studentId = studentId;
+	}
+	public String getStudentName() {
+		return studentName;
+	}
+	public void setStudentName(String studentName) {
+		this.studentName = studentName;
+	}
+	public Integer getClockFlag() {
+		return clockFlag;
+	}
+	public void setClockFlag(Integer clockFlag) {
+		this.clockFlag = clockFlag;
+	}
+	public Integer getBroadcast() {
+		return broadcast;
+	}
+	public void setBroadcast(Integer broadcast) {
+		this.broadcast = broadcast;
+	}
+	public String getPostTime() {
+		return postTime;
+	}
+	public void setPostTime(String postTime) {
+		this.postTime = postTime;
+	}
+	
+}

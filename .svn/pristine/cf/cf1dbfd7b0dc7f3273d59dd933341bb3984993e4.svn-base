@@ -1,0 +1,212 @@
+package com.talkweb.weixin.main;
+
+
+import net.sf.json.JSONObject;
+
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.*;
+
+import com.talkweb.weixin.pojo.AccessToken;
+import com.talkweb.weixin.util.WeiXinUtil;
+
+public class SendMsgThread  extends Thread{
+	
+	
+	class TemplateMessage{
+		int		Id;
+		int		ActivityId;
+		String	Title;
+		String	PositionDesc;
+		String	StartTime;
+		String 	FormId;
+		String	OpenId;
+	};
+	
+	class TemplateMessage2{
+		int		Id;
+		int		BookId;
+		String	Title;
+		int 	MembersCount;
+		String 	FormId;
+		String	OpenId;
+	};
+	
+	class TemplateMessage21{
+		int		Id;
+		int		uId;
+		int		NoteId;
+		int 	ReplyId;
+		String	Title;
+		String 	FormId;
+		String 	Desc;
+		String	RemindTime;
+		String	OpenId;
+	};
+	
+	class TemplateMessage3{
+		int		Id;
+		int		uId;
+		int		RecipeId;
+		String	Title;
+		int 	Desc;
+		String 	RecipeDateStr;
+		String	OpenId;		
+	}
+
+	private static Logger log = LoggerFactory.getLogger(SendMsgThread.class);
+		
+	public void run() {
+
+		ArrayList<TemplateMessage> activityTmList = new ArrayList<TemplateMessage>();
+		ArrayList<TemplateMessage2> bjTmList = new ArrayList<TemplateMessage2>();
+		ArrayList<TemplateMessage21> rjTmList = new ArrayList<TemplateMessage21>();
+		ArrayList<TemplateMessage21> rjTmList2 = new ArrayList<TemplateMessage21>();
+		ArrayList<TemplateMessage3> xqTmList = new ArrayList<TemplateMessage3>();
+		
+		int cnt = 0;
+		
+		//随机停2000毫秒-10000毫秒
+		Random rand = new Random();
+		try{
+			Thread.sleep(rand.nextInt(8000) + 2000);
+		}catch(Exception e){			
+		}
+		
+		
+		while (true) {
+			
+			try {			
+				
+				AccessToken accessToken = StartOnLoad.tokenThread1.accessToken;		
+
+				if(accessToken == null){
+					Thread.sleep(5*1000);
+					continue;
+				}
+				
+				//随机停200毫秒
+				Random rand2= new Random();
+				try{
+					Thread.sleep(rand2.nextInt(200) + 100);
+				}catch(Exception e){			
+				}
+				
+				String token = StartOnLoad.tokenThread1.accessToken.token;
+				JSONObject result;
+				
+				TemplateMessage tm = new TemplateMessage();
+				tm.OpenId = "olZLzwaol_1kI_rO7dEqEUE9z12A";
+				tm.ActivityId = 0;
+				tm.Title = "test";
+				tm.StartTime = "2019-01-09";
+				tm.PositionDesc = "133";
+				
+				JSONObject data = new JSONObject();
+				JSONObject value = new JSONObject();
+				
+				String page = "pages/post/postDetail/postDetail?activityId=" + tm.ActivityId;
+				
+				value.put("value", tm.Title);
+				value.put("color", "#FFA500");
+				data.put("keyword1", value);
+				
+				value.put("value", tm.StartTime);
+				value.put("color", "#000000");
+				data.put("keyword2", value);
+				
+				value.put("value", tm.PositionDesc);
+				value.put("color", "#000000");
+				data.put("keyword3", value);
+
+				value.put("value", "1111111");
+				value.put("color", "#000000");
+				data.put("keyword4", value);
+
+				
+				String temlate_url = "Botk5ztCsJer8Q8Ox7N17sfsISj3jyCBSETisxA_rwQ";
+				
+				//WeiXinUtil.sendTemplateMsg3(token, tm.OpenId, page, temlate_url, data);	
+				Thread.sleep(60*1000);				
+				
+				//发送模板消息
+/*
+				//取报名表详情模板消息数据
+				activityTmList.clear();
+				sql = "select a.EnrollId, c.ActivityId, c.title, c.PositionDesc, c.StartTime, a.FormId, b.OpenId from YJ_Activity_Enroll a, YJ_User b, YJ_Activity_Detail c where a.IsSendMsg = 0 and a.ActivityId=c.ActivityId and a.formId is not null and a.Uid=b.Uid and now()+interval c.CutMinute*60 second > c.StartTime Limit 10";
+				inTemp = "(0";				
+				rs = dao.doQuery(sql);
+				while (rs.next()) {
+					TemplateMessage tm = new TemplateMessage();
+					tm.ActivityId = rs.getInt("ActivityId");					
+					tm.Id = rs.getInt("EnrollId");
+					tm.Title = rs.getString("title");
+					tm.PositionDesc = rs.getString("PositionDesc");
+					
+					SimpleDateFormat sdf1 = new SimpleDateFormat("yyyy/MM/dd");
+					Date startDate = rs.getDate("StartTime");
+					String startDateS = sdf1.format(startDate);
+
+					SimpleDateFormat sdf2 = new SimpleDateFormat("HH:mm");
+					Date startTime = rs.getTime("StartTime");
+					String startTimeS = startDateS + " " + sdf2.format(startTime);
+					
+					tm.StartTime = startTimeS;
+					tm.FormId = rs.getString("FormId");
+					tm.OpenId = rs.getString("OpenId");
+					inTemp += "," + tm.Id;
+					
+					activityTmList.add(tm);
+					
+				}
+				dao.close();
+
+				inTemp += ")";
+				
+				for(int i= 0 ; i < activityTmList.size(); i++){
+					TemplateMessage tm = activityTmList.get(i);
+					
+					JSONObject data = new JSONObject();
+					JSONObject value = new JSONObject();
+					
+					String page = "pages/post/postDetail/postDetail?activityId=" + tm.ActivityId;
+					
+					value.put("value", tm.Title);
+					value.put("color", "#FFA500");
+					data.put("keyword1", value);
+					
+					value.put("value", tm.StartTime);
+					value.put("color", "#000000");
+					data.put("keyword2", value);
+					
+					value.put("value", tm.PositionDesc);
+					value.put("color", "#000000");
+					data.put("keyword3", value);
+
+					value.put("value", "亲，活动即将开始了，请及时到场哦~");
+					value.put("color", "#000000");
+					data.put("keyword4", value);
+
+					WeiXinUtil.sendTemplateMsg(token, tm.OpenId, page, tm.FormId, data);	
+					Thread.sleep(200);
+				}
+								
+				//更新标志
+				sql = "update YJ_Activity_Enroll set IsSendMsg = 1 where EnrollId in" + inTemp;
+				dao.executeUpdate(sql);				
+*/
+				
+				
+				Thread.sleep(5 * 1000);	
+			} catch (Exception e) {
+				System.out.print(e.getMessage());
+				//log.error("SendMsgThread-run:"+e.getMessage());				
+			}
+			
+		}
+	}
+
+	
+}
+

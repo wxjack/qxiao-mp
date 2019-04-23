@@ -1,0 +1,400 @@
+package com.qxiao.wx.homework.jpa.service.impl;
+
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.json.JSONArray;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.qxiao.wx.common.JsonMapper;
+import com.qxiao.wx.fresh.vo.QmImage;
+import com.qxiao.wx.homework.dto.QmHomeworkInfoDetailDTO;
+import com.qxiao.wx.homework.dto.QmHomeworkInfoListDTO;
+import com.qxiao.wx.homework.dto.QmHomeworkReaderDTO;
+import com.qxiao.wx.homework.jpa.dao.QmHomeworkImageDao;
+import com.qxiao.wx.homework.jpa.dao.QmHomeworkInfoDao;
+import com.qxiao.wx.homework.jpa.dao.QmHomeworkReadConfirmDao;
+import com.qxiao.wx.homework.jpa.dao.QmHomeworkSenderDao;
+import com.qxiao.wx.homework.jpa.entity.QmHomeworkImage;
+import com.qxiao.wx.homework.jpa.entity.QmHomeworkInfo;
+import com.qxiao.wx.homework.jpa.entity.QmHomeworkReadConfirm;
+import com.qxiao.wx.homework.jpa.entity.QmHomeworkSender;
+import com.qxiao.wx.homework.jpa.service.IQmHomeworkService;
+import com.qxiao.wx.homework.jpa.vo.QmReaderVO;
+import com.qxiao.wx.homework.jpa.vo.ReadCountVO;
+import com.qxiao.wx.user.jpa.dao.QmAccountDao;
+import com.qxiao.wx.user.jpa.dao.QmMessageSendDao;
+import com.qxiao.wx.user.jpa.dao.QmPatriarchDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolTeacherDao;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.entity.QmMessageSend;
+import com.qxiao.wx.user.jpa.entity.QmPatriarch;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolTeacher;
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@Service
+public class QmHomeworkServiceImpl extends AbstractJdbcService<QmHomeworkInfo> implements IQmHomeworkService {
+
+	@Autowired
+	private QmHomeworkInfoDao homeworkInfoDao;
+	@Autowired
+	private QmPlaySchoolTeacherDao teacherDao;
+	@Autowired
+	private QmHomeworkSenderDao senderDao;
+	@Autowired
+	private QmHomeworkImageDao imageDao;
+	@Autowired
+	private QmStudentDao stuDao;
+	@Autowired
+	private QmPatriarchDao qpDao;
+	@Autowired
+	private QmHomeworkReadConfirmDao confirmDao;
+	@Autowired
+	private QmPatriarchDao patriarchDao;
+	@Autowired
+	private QmMessageSendDao sendDao;
+	@Autowired
+	private QmAccountDao accountDao;
+
+	@Override
+	public JPADao<QmHomeworkInfo> getDao() {
+		return this.homeworkInfoDao;
+	}
+
+	@Override
+	public Class<QmHomeworkInfo> getEntityClass() {
+		return QmHomeworkInfo.class;
+	}
+
+	@Override
+	/**
+	 * 发布作业
+	 */
+	@Transactional
+	public void homeworkAdd(String openId, String title, String textContent, JSONArray images, JSONArray senders,
+			int needConfirm) throws ServiceException, JsonParseException, JsonMappingException, IOException {
+		QmPlaySchoolTeacher teacher = this.getTeacher(openId);
+		if (teacher.getType() != 1) {
+			throw new ServiceException("亲，您没有权限哦！");
+		}
+		// 发布作业
+		QmHomeworkInfo info = this.addHomework(openId, teacher.getTeacherId(), title, textContent, needConfirm);
+		// 添加图片
+		this.addImages(info.getHomeId(), images);
+		// 添加推送对象
+		this.addSender(senders, info.getHomeId());
+
+		this.sendMessage(info, senders);
+	}
+
+	private void sendMessage(QmHomeworkInfo info, JSONArray senders) {
+		Iterator<Object> it = senders.iterator();
+		List<QmMessageSend> msges = new ArrayList<>();
+		while (it.hasNext()) {
+			Map<String, Integer> map = JsonMapper.toMap(it.next() + "");
+			Long classId = Long.valueOf(map.get("classId").toString());
+			List<QmPatriarch> patriarchs = patriarchDao.findByClassId(classId);
+			for (QmPatriarch par : patriarchs) {
+				this.templateMessage(msges, info, par.getOpenId());
+			}
+		}
+		sendDao.save(msges);
+	}
+
+	private void templateMessage(List<QmMessageSend> msges, QmHomeworkInfo info, String openId) {
+		QmMessageSend message = new QmMessageSend();
+		message.setMessageId(info.getHomeId());
+		message.setType(5);
+		message.setOpenId(openId);
+		message.setResult(0);
+		message.setTitle(info.getTitle());
+		message.setTextContent(info.getTextContent());
+		message.setPostTime(new Date());
+		msges.add(message);
+	}
+
+	private QmPlaySchoolTeacher getTeacher(String openId) {
+		return teacherDao.findByOpenId(openId);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Transactional
+	private void addSender(JSONArray senders, Long homeId)
+			throws JsonParseException, JsonMappingException, IOException {
+		if (senders != null) {
+			List<QmHomeworkSender> sends = new ArrayList<>();
+			Iterator<Object> it = senders.iterator();
+			while (it.hasNext()) {
+				QmHomeworkSender sender = new QmHomeworkSender();
+				String str = it.next() + "";
+				Map<String, Object> map = JsonMapper.getMapper().readValue(str, HashMap.class);
+				Long classId = Long.parseLong(map.get("classId") + "");
+				sender.setHomeId(homeId);
+				sender.setClassId(classId);
+				sender.setPostTime(new Date());
+				sends.add(sender);
+			}
+			senderDao.save(sends);
+		}
+	}
+
+	@Transactional
+	private void addImages(Long homeId, JSONArray images) {
+		if (images != null) {
+			Iterator<Object> it = images.iterator();
+			List<QmHomeworkImage> imgs = new ArrayList<>();
+			while (it.hasNext()) {
+				QmHomeworkImage image = new QmHomeworkImage();
+				String str = it.next() + "";
+				QmImage img = JsonMapper.obj2Instance(str, QmImage.class);
+				image.setHomeId(homeId);
+				image.setImageUrl(img.getImageUrl());
+				image.setSmallUrl("small_" + img.getImageUrl());
+				image.setPostTime(new Date());
+				imgs.add(image);
+			}
+			imageDao.save(imgs);
+		}
+	}
+
+	@Transactional
+	private QmHomeworkInfo addHomework(String openId, Long teacherId, String title, String textContent,
+			int needConfirm) {
+		QmHomeworkInfo info = new QmHomeworkInfo();
+		info.setTeacherId(teacherId);
+		info.setConfirmFlage(needConfirm);
+		info.setIsDel(0);
+		info.setMessageSend(1);
+		info.setTitle(title);
+		info.setTextContent(textContent);
+		info.setOpenId(openId);
+		info.setPostTime(new Date());
+		return homeworkInfoDao.save(info);
+	}
+
+	@Override
+	@Transactional /** 删除作业 */
+	public void homeworkDelete(String openId, Long homeId) throws ServiceException {
+		QmPlaySchoolTeacher teacher = this.getTeacher(openId);
+		if (teacher.getType() != 0) {
+			throw new ServiceException("亲，您没有权限哦！");
+		}
+		QmHomeworkInfo homeworkInfo = homeworkInfoDao.findOne(homeId);
+		homeworkInfo.setIsDel(1);
+		homeworkInfoDao.save(homeworkInfo);
+	}
+
+	@Override
+	// 作业详情查询
+	public QmHomeworkInfoDetailDTO homeworkDetail(String openId, Long homeId, Long classId) throws ServiceException {
+
+		QmHomeworkInfoDetailDTO detailDTO = new QmHomeworkInfoDetailDTO();
+		QmPatriarch patriarch = qpDao.findByOpenId(openId);
+		QmHomeworkInfo info = homeworkInfoDao.findByHomeIdAndMessageSend(homeId, 1);
+		try {
+			BeanUtils.copyProperties(detailDTO, info);
+		} catch (IllegalAccessException | InvocationTargetException e) {
+			e.printStackTrace();
+		}
+		if (patriarch != null) {
+			QmHomeworkReadConfirm cof = this.findHomeworkReadConfirm(openId);
+			if (cof == null) {
+				// 记录阅读人数
+				cof = this.addHomeworkReadConfirm(openId, homeId, classId);
+			}
+			detailDTO.setConfirmFlag(cof.getConfirmFlag());
+		} else {
+			detailDTO.setConfirmFlag(0);
+		}
+		// 获取图片
+		this.getImages(detailDTO, homeId, classId);
+		// 获取阅读人数
+		this.getReadCount(detailDTO, homeId, classId);
+
+		return detailDTO;
+	}
+
+	private QmHomeworkReadConfirm findHomeworkReadConfirm(String openId) {
+		return confirmDao.findByOpenId(openId);
+	}
+
+	private QmHomeworkReadConfirm addHomeworkReadConfirm(String openId, Long homeId, Long classId)
+			throws ServiceException {
+		QmStudent stu = stuDao.findByOpenId(openId);
+		if (stu != null) {
+			QmHomeworkReadConfirm readConfirm = new QmHomeworkReadConfirm();
+			readConfirm.setConfirmFlag(0);
+			readConfirm.setHomeId(homeId);
+			readConfirm.setStudentId(stu.getStudentId());
+			readConfirm.setPostTime(new Date());
+			return confirmDao.save(readConfirm);
+		}
+		return null;
+	}
+
+	private void getReadCount(QmHomeworkInfoDetailDTO detailDTO, Long homeId, Long classId) {
+		String sql = "SELECT SUM(qh.home_id IS NOT NULL) AS classReadCount, SUM(qh.home_id IS NULL) AS classUnreadCount "
+				+ "FROM qm_student AS qs LEFT JOIN qm_class_student AS qcs ON qcs.student_id = qs.student_id "
+				+ "LEFT JOIN qm_homework_read_confirm AS qh ON qh.student_id = qs.student_id "
+				+ "WHERE qh.home_id = :homeId AND qcs.class_id = :classId GROUP BY qs.student_id ";
+		Map<String, Object> paras = new HashMap<>();
+		paras.put("homeId", homeId);
+		paras.put("classId", classId);
+		List<Map<String, Object>> images = super.findList(sql, paras);
+		Map<String, Object> map = new HashMap<>();
+		if (CollectionUtils.isNotEmpty(images)) {
+			map = images.get(0);
+			detailDTO.setClassReadCount(Integer.parseInt(map.get("classReadCount") + ""));
+			detailDTO.setClassUnreadCount(Integer.parseInt(map.get("classUnreadCount") + ""));
+		} else {
+			detailDTO.setClassReadCount(0);
+			detailDTO.setClassUnreadCount(0);
+		}
+
+	}
+
+	private void getImages(QmHomeworkInfoDetailDTO detailDTO, Long homeId, Long classId) {
+		String sql = "SELECT qhi.image_url AS imageUrl FROM qm_homework_info AS qi "
+				+ "JOIN qm_homework_image AS qhi ON qi.home_id = qhi.home_id "
+				+ "JOIN qm_homework_sender AS qhs ON qhs.home_id = qi.home_id "
+				+ "WHERE qi.home_id = :homeId AND qhs.class_id = :classId ";
+		Map<String, Object> paras = new HashMap<>();
+		paras.put("homeId", homeId);
+		paras.put("classId", classId);
+		List<Map<String, Object>> images = super.findList(sql, paras);
+		detailDTO.setImages(images);
+	}
+
+	@Override
+	public List<QmHomeworkInfoListDTO> homeworkQuery(String openId, Long classId) throws ServiceException {
+		List<QmHomeworkInfo> infos = homeworkInfoDao.findByClassId(classId);
+		List<QmHomeworkInfoListDTO> infoListDTOs = new ArrayList<>();
+		if (CollectionUtils.isEmpty(infos)) {
+			return infoListDTOs;
+		}
+		for (QmHomeworkInfo info : infos) {
+			QmHomeworkInfoListDTO infoDto = new QmHomeworkInfoListDTO();
+			try {
+				BeanUtils.copyProperties(infoDto, info);
+				infoDto.setClassId(classId);
+			} catch (IllegalAccessException | InvocationTargetException e) {
+				e.printStackTrace();
+			}
+			// 获取首图
+			this.getTopImage(infoDto, info.getHomeId());
+			// 获取阅读人数
+			this.getClassReaders(infoDto, info.getHomeId());
+
+			infoListDTOs.add(infoDto);
+		}
+		return infoListDTOs;
+	}
+
+	private void getClassReaders(QmHomeworkInfoListDTO infoDto, Long homeId) throws ServiceException {
+		String sql = "select q.* from qm_homework_read_confirm q where q.home_id = ?";
+		int count = super.count(sql, new Object[] { homeId });
+		infoDto.setClassReadCount(count);
+	}
+
+	private void getTopImage(QmHomeworkInfoListDTO infoDto, Long homeId) {
+		List<QmHomeworkImage> images = imageDao.findByHomeId(homeId);
+		if (CollectionUtils.isNotEmpty(images)) {
+			QmHomeworkImage image = images.get(0);
+			infoDto.setTopImage(image.getImageUrl());
+		}
+	}
+
+	@Override
+	// 作业阅读人员查询
+	public QmHomeworkReaderDTO homeworkReaders(String openId, Long classId, Long homeId, int readFlag) {
+		// 获取家庭作业信息
+		QmHomeworkReaderDTO readerDTO = this.findHomeworkInfo(classId, homeId);
+		// 获取阅读家庭作业的学生信息
+		this.findReaderInfo(readerDTO, classId, homeId, readFlag);
+		return readerDTO;
+	}
+
+	private void findReaderInfo(QmHomeworkReaderDTO readerDTO, Long classId, Long homeId, int readFlag) {
+		List<QmReaderVO> readers = new ArrayList<>();
+		if (readFlag == 1) {
+			readers = this.readInfo(classId,homeId);
+		} else {
+			readers = this.unReadInfo(classId,homeId);
+		}
+		if (CollectionUtils.isNotEmpty(readers)) {
+			for (QmReaderVO vo : readers) {
+				QmAccount account = accountDao.findByStudentId(vo.getStudentId());
+				vo.setPhoto(account.getPhoto());
+			}
+		}
+		readerDTO.setReaders(readers);
+	}
+
+	private List<QmReaderVO> unReadInfo(Long classId, Long homeId) {
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<QmReaderVO> readInfo(Long classId, Long homeId) {
+		String sql = "SELECT  qs.student_id AS studentId,  qs.student_name AS studentName, "
+				+ "	qs.photo AS photo,  qp.relation AS relation,  qhr.confirm_flag AS confirmFlag, "
+				+ "	qhr.post_time AS postTime FROM  qm_student AS qs "
+				+ "JOIN qm_homework_read_confirm AS qhr ON qs.student_id = qhr.student_id "
+				+ "JOIN qm_class_student AS qcs ON qs.student_id = qcs.student_id "
+				+ "JOIN qm_patriarch_student AS qps ON qs.student_id = qps.student_id "
+				+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id WHERE  qcs.class_id = ? "
+				+ "AND qhr.home_id = ?";
+		List<QmReaderVO> findList = (List<QmReaderVO>) this.findList(sql, new Object[] {classId,homeId}, QmReaderVO.class);
+		return findList;
+	}
+
+	private QmHomeworkReaderDTO findHomeworkInfo(Long classId, Long homeId) {
+		QmHomeworkInfo hInfo = homeworkInfoDao.findByHomeIdAndClassId(homeId, classId);
+		QmHomeworkReaderDTO readerDTO = new QmHomeworkReaderDTO();
+		this.queryReadCount(readerDTO, classId);
+		readerDTO.setHomeId(homeId);
+		readerDTO.setTitle(hInfo.getTitle());
+		readerDTO.setPostTime(hInfo.getPostTime());
+		return readerDTO;
+	}
+
+	@SuppressWarnings("unchecked")
+	private void queryReadCount(QmHomeworkReaderDTO readerDTO, Long classId) {
+		String sql = "select COUNT(qh.id) AS readCount, "
+				+ "	COUNT(qs.student_id) - COUNT(qh.id) AS unReadCount from qm_student qs  "
+				+ "LEFT JOIN qm_homework_read_confirm qh on qh.student_id = qs.student_id "
+				+ "LEFT JOIN qm_class_student qcs ON qs.student_id = qcs.student_id where qcs.class_id = ?";
+		List<ReadCountVO> findList = (List<ReadCountVO>) this.findList(sql, new Object[] { classId },
+				ReadCountVO.class);
+		if (CollectionUtils.isNotEmpty(findList)) {
+			readerDTO.setReadCount(findList.get(0).getReadCount());
+			readerDTO.setUnReadCount(findList.get(0).getUnReadCount());
+		}
+	}
+
+	@Override
+	public void homeWorkConfirm(String openId, Long homeId, Long classId) {
+		// TODO Auto-generated method stub
+//		QmStudent stu = stuDao.findByOpenId(openId);
+		QmHomeworkReadConfirm confirm = confirmDao.findByOpenId(openId);
+		confirm.setConfirmFlag(1);
+		confirmDao.save(confirm);
+	}
+}

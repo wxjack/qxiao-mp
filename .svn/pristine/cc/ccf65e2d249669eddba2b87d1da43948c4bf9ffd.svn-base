@@ -1,0 +1,350 @@
+package com.qxiao.wx.fresh.jpa.service.impl;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.collections.CollectionUtils;
+import org.json.JSONArray;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.common.JsonMapper;
+import com.qxiao.wx.fresh.dto.QmFreshDetailDTO;
+import com.qxiao.wx.fresh.dto.QmFreshInfoDTO;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshCommentDao;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshImageDao;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshInfoDao;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshReadDao;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshSenderDao;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshComment;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshImage;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshInfo;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshRead;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshSender;
+import com.qxiao.wx.fresh.jpa.service.IQmFreshInfoService;
+import com.qxiao.wx.fresh.vo.Clazz;
+import com.qxiao.wx.fresh.vo.QmCommentVO;
+import com.qxiao.wx.fresh.vo.QmFreshInfoVO;
+import com.qxiao.wx.fresh.vo.QmImage;
+import com.qxiao.wx.user.jpa.dao.QmMessageSendDao;
+import com.qxiao.wx.user.jpa.dao.QmPatriarchDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.entity.QmMessageSend;
+import com.qxiao.wx.user.jpa.entity.QmPatriarch;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@Service
+public class QmFreshInfoServiceImpl extends AbstractJdbcService<QmFreshInfo> implements IQmFreshInfoService {
+
+	@Autowired
+	private QmFreshInfoDao freshInfoDao;
+	@Autowired
+	private QmFreshImageDao imageDao;
+	@Autowired
+	private QmFreshReadDao readDao;
+	@Autowired
+	private QmFreshCommentDao commentDao;
+	@Autowired
+	private QmPlaySchoolInfoDao schoolInfoDao;
+	@Autowired
+	private QmFreshSenderDao senderDao;
+	@Autowired
+	private QmStudentDao stuDao;
+	@Autowired
+	private QmPatriarchDao patriarchDao;
+	@Autowired
+	private QmMessageSendDao messageDao;
+
+	@Override
+	public JPADao<QmFreshInfo> getDao() {
+		return this.freshInfoDao;
+	}
+
+	@Override
+	public Class<QmFreshInfo> getEntityClass() {
+		return QmFreshInfo.class;
+	}
+
+	// 速报列表
+	@Override
+	public List<QmFreshInfoDTO> findByClassId(String openId, Long classId) throws ServiceException {
+
+		List<QmFreshInfoVO> freshs = null;
+
+		if (classId > 0) {
+			freshs = this.findFreshInfoVOs(classId);
+		} else {
+			freshs = this.findInfosBySchoolId(openId);
+		}
+
+		List<QmFreshInfoDTO> freshInfoDTOs = new ArrayList<>();
+
+		for (QmFreshInfoVO fresh : freshs) {
+			QmFreshInfoDTO fi = new QmFreshInfoDTO();
+			Long freshId = fresh.getFreshId();
+			fi.setFreshId(freshId);
+			fi.setPostTime(fresh.getPostTime());
+//			if (classId > 0) {
+//				fi.setClassId(classId);
+//			}
+			fi.setClassId(classId);
+			fi.setTitle(fresh.getTitle());
+			fi.setTextContent(fresh.getTextContent());
+			QmFreshImage image = imageDao.findOne(freshId);
+			if(image!=null) {
+				fi.setTopImage(image.getImageUrl());
+			}
+			// 阅读人数
+			this.findClassReadCount(fi, freshId, classId);
+			// 留言人数
+			this.findClassCommentCount(fi, freshId, classId);
+			freshInfoDTOs.add(fi);
+		}
+		return freshInfoDTOs;
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<QmFreshInfoVO> findInfosBySchoolId(String openId) {
+		QmPlaySchoolInfo school = schoolInfoDao.findByOpenId(openId);
+		String sql = "SELECT qfi.fresh_id AS freshId, ( SELECT  q.class_id FROM "
+				+ "qm_fresh_sender AS q  where q.fresh_id = qfi.fresh_id and q.class_id = qpsc.class_id "
+				+ ") AS classId,  qfi.title AS title, SUBSTRING(qfi.text_content, 1, 50) AS textContent, "
+				+ "qfi.post_time AS postTime  FROM  qm_fresh_info AS qfi "
+				+ "JOIN qm_fresh_sender AS qds ON qfi.fresh_id = qds.fresh_id "
+				+ "JOIN qm_play_school_class AS qpsc ON qpsc.class_id = qds.class_id "
+				+ "JOIN qm_play_school_info AS qpsi ON qpsi.school_id = qpsc.school_id  WHERE "
+				+ "qpsi.school_id = ? AND qfi.message_send = 1 ";
+		return (List<QmFreshInfoVO>) super.findList(sql, new Object[] { school.getSchoolId() }, QmFreshInfoVO.class);
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<QmFreshInfoVO> findFreshInfoVOs(Long classId) {
+		String sql = "SELECT qfi.fresh_id AS freshId, qfi.title AS title, SUBSTRING(qfi.text_content, 1, 50) AS textContent,"
+				+ "qfi.post_time AS postTime FROM qm_fresh_info AS qfi JOIN qm_fresh_sender AS qds ON qfi.fresh_id = qds.fresh_id "
+				+ "WHERE qds.class_id = ? AND qfi.message_send = 1 GROUP BY freshId ";
+		return (List<QmFreshInfoVO>) super.findList(sql, new Object[] { classId }, QmFreshInfoVO.class);
+	}
+
+	private void findClassCommentCount(QmFreshInfoDTO fi, Long freshId, Long classId) {
+		List<QmFreshComment> comments = commentDao.findByFreshIdAndClassId(freshId, classId);
+		if (CollectionUtils.isNotEmpty(comments)) {
+			fi.setClassCommentCount(comments.size());
+		} else {
+			fi.setClassCommentCount(0);
+		}
+	}
+
+	private void findClassReadCount(QmFreshInfoDTO fi, Long freshId, Long classId) {
+		List<QmFreshRead> reads = readDao.findByFreshIdAndClassId(freshId, classId);
+		if (CollectionUtils.isNotEmpty(reads)) {
+			fi.setClassReadCount(reads.size());
+		} else {
+			fi.setClassReadCount(0);
+		}
+	}
+
+	// 速报详情
+	@Override
+	public QmFreshDetailDTO findFreshDetail(String openId, Long freshId, Long classId) {
+
+		this.addFreshRead(classId, openId, freshId);
+		QmPlaySchoolInfo school = schoolInfoDao.findByClassId(classId);
+		QmFreshInfo freshInfo = freshInfoDao.findOne(freshId); 
+		QmFreshDetailDTO detail = new QmFreshDetailDTO();
+		try {
+			BeanUtils.copyProperties(detail, freshInfo);
+		} catch (IllegalAccessException | InvocationTargetException e) {
+			e.printStackTrace();
+		}
+		detail.setSchoolName(school.getSchoolName());
+		List<Map<String, String>> images = new ArrayList<>();
+
+		this.findImages(images, freshId);
+
+		detail.setImages(images);
+		QmPlaySchoolInfo c = schoolInfoDao.findByClassId(classId);
+		detail.setSchoolName(c.getSchoolName());
+
+		this.findClassReadCount(detail, freshId, classId);
+
+		this.findClassCommentCount(detail, freshId, classId);
+
+		List<QmCommentVO> commentVOs = this.findQmCommentVO(freshId, classId, openId);
+
+		detail.setCommentList(commentVOs);
+		return detail;
+	}
+
+	@Transactional
+	// 记录阅读人数
+	private void addFreshRead(Long classId, String openId, Long freshId) {
+		QmStudent student = stuDao.findByOpenId(openId);
+		if (student != null) {
+			QmFreshRead read = readDao.findByStudentId(student.getStudentId());
+			if (read == null) {
+				read = new QmFreshRead();
+				read.setFreshId(freshId);
+				read.setStudentId(student.getStudentId());
+				read.setPostTime(new Date());
+				readDao.save(read);
+			}
+		}
+	}
+
+	// 获取的速报图片
+	private void findImages(List<Map<String, String>> images, Long freshId) {
+		List<QmFreshImage> list = imageDao.findByFreshId(freshId);
+		if (CollectionUtils.isNotEmpty(list)) {
+			for (QmFreshImage image : list) {
+				Map<String, String> map = new HashMap<>();
+				map.put("imageUrl", image.getImageUrl());
+				images.add(map);
+			}
+		}
+	}
+
+	// 获取班级留言人数
+	private void findClassCommentCount(QmFreshDetailDTO detail, Long freshId, Long classId) {
+		List<QmFreshComment> comments = commentDao.findByFreshIdAndClassId(freshId, classId);
+		if (CollectionUtils.isNotEmpty(comments)) {
+			detail.setClassCommentCount(comments.size());
+		} else {
+			detail.setClassCommentCount(0);
+		}
+	}
+
+	// 获取班级阅读人数
+	private void findClassReadCount(QmFreshDetailDTO detail, Long freshId, Long classId) {
+		List<QmFreshRead> reads = readDao.findByFreshIdAndClassId(freshId, classId);
+		if (CollectionUtils.isNotEmpty(reads)) {
+			detail.setClassReadCount(reads.size());
+		} else {
+			detail.setClassReadCount(0);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<QmCommentVO> findQmCommentVO(Long freshId, Long classId, String openId) {
+		String sql = "SELECT qfc.comment_id AS commentId, qfc.text_content AS textContent, "
+				+ "qs.student_name AS NAME, qp.relation AS relation, qs.photo AS photo FROM "
+				+ "qm_fresh_comment AS qfc JOIN qm_fresh_info AS qfi ON qfi.fresh_id = qfc.fresh_id "
+				+ "JOIN qm_fresh_sender AS qfs ON qfs.fresh_id = qfi.fresh_id "
+				+ "JOIN qm_patriarch AS qp ON qp.open_id = qfc.open_id "
+				+ "JOIN qm_patriarch_student AS qps ON qp.id = qps.patriarch_id "
+				+ "JOIN qm_student AS qs ON qps.student_id = qs.student_id WHERE qfi.fresh_id = ? "
+				+ "AND qfs.class_id = ?  ORDER BY commentId ";
+		return (List<QmCommentVO>) this.findList(sql, new Object[] { freshId, classId }, QmCommentVO.class);
+	}
+
+	@Override
+	@Transactional
+	public QmFreshInfo addFresh(String openId, String title, String textContent, JSONArray images, JSONArray senders) {
+		QmFreshInfo freshInfo = new QmFreshInfo();
+		freshInfo.setIsDel(0);
+		freshInfo.setMessageSend(0);
+		freshInfo.setTextContent(textContent);
+		freshInfo.setTitle(title);
+		freshInfo.setPostTime(new Date());
+		freshInfo.setOpenId(openId);
+		freshInfo = freshInfoDao.save(freshInfo);
+		// 保存图片
+		this.addImage(images, freshInfo.getFreshId());
+		// 记录推送到那些班级
+		this.addSender(senders, freshInfo.getFreshId());
+		
+		// 添加推送模板
+		this.sendMessage(freshInfo,senders);
+		
+		return freshInfo;
+	}
+
+	private void sendMessage(QmFreshInfo info, JSONArray senders) {
+		Iterator<Object> it = senders.iterator();
+		List<QmMessageSend> msges = new ArrayList<>();
+		while (it.hasNext()) {
+			Map<String, Integer> map = JsonMapper.toMap(it.next()+"");
+			Long classId = Long.parseLong(map.get("classId") + "");
+			
+			List<QmPatriarch> patriarchs = patriarchDao.findByClassId(classId);
+			for (QmPatriarch par : patriarchs) {
+				this.templateMessage(msges, info, par.getOpenId());
+			}
+		}
+		messageDao.save(msges);
+	}
+
+	private void templateMessage(List<QmMessageSend> msges, QmFreshInfo info, String openId) {
+		QmMessageSend message = new QmMessageSend();
+		message.setMessageId(info.getFreshId());
+		message.setType(2);
+		message.setOpenId(openId);
+		message.setResult(0);
+		message.setTitle(info.getTitle());
+		message.setTextContent(info.getTextContent());
+		message.setPostTime(new Date());
+		msges.add(message);
+	}
+
+	@Transactional
+	private void addSender(JSONArray senders, Long freshId) {
+		Iterator<Object> it = senders.iterator();
+		List<QmFreshSender> freshSenders = new ArrayList<>();
+		while (it.hasNext()) {
+			String string = it.next() + "";
+			QmFreshSender sender = new QmFreshSender();
+			Clazz clazz = JsonMapper.obj2Instance(string, Clazz.class);
+			sender.setFreshId(freshId);
+			sender.setClassId(clazz.getClassId());
+			sender.setPostTime(new Date());
+			freshSenders.add(sender);
+		}
+		senderDao.save(freshSenders);
+	}
+
+	@Transactional
+	private void addImage(JSONArray images, Long freshId) {
+		Iterator<Object> it = images.iterator();
+		List<QmFreshImage> freshImages = new ArrayList<>();
+		while (it.hasNext()) {
+			String string = it.next() + "";
+			QmFreshImage freshImage = new QmFreshImage();
+			QmImage image = JsonMapper.obj2Instance(string, QmImage.class);
+			freshImage.setFreshId(freshId);
+			freshImage.setImageUrl(image.getImageUrl());
+			freshImage.setPostTime(new Date());
+			freshImages.add(freshImage);
+		}
+		imageDao.save(freshImages);
+	}
+
+	@Override
+	// 推送消息
+	@Transactional
+	public void sendFresh(Long freshId, String openId) {
+		QmFreshInfo fresh = freshInfoDao.findOne(freshId);
+		fresh.setMessageSend(1);
+		fresh.setSendTime(new Date());
+		freshInfoDao.save(fresh);
+	}
+
+	@Override
+	public void deleteFresh(Long freshId, String openId) {
+		QmFreshInfo freshInfo = freshInfoDao.findOne(freshId);
+		freshInfo.setIsDel(1);
+		freshInfoDao.save(freshInfo);
+	}
+
+}

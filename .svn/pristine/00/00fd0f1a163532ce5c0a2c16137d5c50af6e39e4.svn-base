@@ -1,0 +1,40 @@
+package com.qxiao.wx.community.sqlconst;
+
+/**
+ * sql语句
+ * 
+ * @author xiaojiao
+ *
+ * @创建时间：2018年12月28日
+ */
+public class CommunitySQL {
+
+	public static String findWirhTeacher() {
+		String sql = "SELECT DISTINCT qci.community_id AS communityId, qci.open_id AS openId, "
+				+ "qa.photo AS photo, 	qcv.video_url AS videoUrl, 	qci.text_content AS textContent, "
+				+ "qci.post_time AS postTime FROM qm_community_info AS qci "
+				+ "LEFT JOIN qm_class_community AS qcc ON qcc.community_id = qci.community_id "
+				+ "LEFT JOIN qm_account AS qa ON qci.open_id = qa.open_id "
+				+ "LEFT JOIN qm_community_video AS qcv ON qcv.community_id = qci.community_id "
+				+ "WHERE qcc.class_id = ? AND qci.is_del = 0 ORDER BY qci.post_time DESC ";
+		return sql;
+	}
+
+	public static String getPraiseList() {
+		String sql = "SELECT qcs.open_id AS openId, qcs.user_name AS `studentName`, "
+				+ "qcs.relation AS relation, qcs.photo AS photo FROM qm_community_praise AS qcs "
+				+ "JOIN qm_class_community AS qcc ON qcc.community_id = qcs.community_id WHERE "
+				+ "qcs.community_id = ? AND qcc.class_id = ? ORDER BY qcs.post_time DESC";
+		return sql;
+	}
+
+	public static String getCommentList() {
+		String sql = "SELECT qcc.open_id AS openId, qcc.relation AS relation, "
+				+ "qcc.user_name AS studentName, qcc.text_content AS textContent, qcc.photo AS photo "
+				+ "FROM qm_community_comment AS qcc "
+				+ "JOIN qm_class_community AS qc ON qcc.community_id = qc.community_id  WHERE "
+				+ "qcc.community_id = ? AND qc.class_id = ? ORDER BY qcc.post_time DESC";
+		return sql;
+	}
+
+}

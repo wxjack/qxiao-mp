@@ -1,0 +1,17 @@
+package com.qxiao.wx.community.jpa.dao;
+
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.community.jpa.entity.QmCommunityPraise;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmCommunityPraiseDao extends JPADao<QmCommunityPraise> {
+
+	@Modifying
+	@Query(value = "delete from QmCommunityPraise q where q.openId = ?1 and q.communityId = ?2")
+	void deletePraise(String openId, String communityId);
+
+	QmCommunityPraise findByCommunityIdAndOpenId(Long communityId, String openid);
+
+}

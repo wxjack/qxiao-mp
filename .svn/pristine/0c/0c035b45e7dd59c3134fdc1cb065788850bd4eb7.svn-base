@@ -1,0 +1,9 @@
+package com.qxiao.wx.community.jpa.service;
+
+import com.qxiao.wx.community.jpa.entity.QmCommunityComment;
+
+public interface IQmCommunityCommentServicve {
+
+	QmCommunityComment communityComment(String openId,String textContent, Long communityId);
+
+}

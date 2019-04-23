@@ -1,0 +1,29 @@
+package com.qxiao.wx.user.jpa.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmPlaySchoolClassDao extends JPADao<QmPlaySchoolClass>{
+
+	List<QmPlaySchoolClass> findBySchoolId(Long schoolId);
+
+	QmPlaySchoolClass findByClassId(Long classId);
+
+	@Query(value = "SELECT qsc.* FROM qm_play_school_class AS qsc "
+			+ "JOIN qm_class_student AS qcs ON qsc.class_id = qcs.class_id "
+			+ "JOIN qm_patriarch_student AS qps ON qps.student_id = qcs.student_id "
+			+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id WHERE qp.open_id = ?1 "
+			+ "GROUP BY qsc.class_id", nativeQuery = true)
+	List<QmPlaySchoolClass> findWithPatriarch(String openId);
+
+	@Query(value = "SELECT qsc.* FROM qm_play_school_class AS qsc "
+			+ "JOIN qm_class_teacher AS qpst ON qsc.class_id = qpst.class_id "
+			+ "join qm_play_school_teacher as qpsc on qpsc.teacher_id=qpst.teacher_id WHERE "
+			+ "qpsc.open_id = ?1 GROUP BY qsc.class_id", nativeQuery = true)
+	List<QmPlaySchoolClass> findWithTeacher(String openId);
+
+}

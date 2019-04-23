@@ -1,0 +1,258 @@
+package com.qxiao.wx.user.jpa.service.impl;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.community.jpa.dao.QmClassStudentDao;
+import com.qxiao.wx.community.jpa.entity.QmClassStudent;
+import com.qxiao.wx.user.jpa.dao.QmAccountDao;
+import com.qxiao.wx.user.jpa.dao.QmPatriarchDao;
+import com.qxiao.wx.user.jpa.dao.QmPatriarchStudentDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolClassDao;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.entity.QmPatriarch;
+import com.qxiao.wx.user.jpa.entity.QmPatriarchStudent;
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.qxiao.wx.user.jpa.service.StudentService;
+import com.qxiao.wx.user.util.FilerReadExcel;
+import com.qxiao.wx.user.vo.QuerySchoolClassVo;
+import com.qxiao.wx.user.vo.QueryStudentListVo;
+import com.qxiao.wx.user.vo.QueryStudentSupplyVo;
+import com.qxiao.wx.user.vo.QueryStudentVo;
+import com.qxiao.wx.user.vo.StudentSupplyVo;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@Service
+public class StudentServiceImpl extends AbstractJdbcService<QmStudent> implements StudentService {
+
+	@Autowired
+	QmStudentDao studentDao;
+	@Autowired
+	QmPatriarchDao patriarchDao;
+	@Autowired
+	QmPatriarchStudentDao patriarchStudentDao;
+	@Autowired
+	QmClassStudentDao classDao;
+	@Autowired
+	QmPlaySchoolClassDao playClassDao;
+	@Autowired
+	QmAccountDao accountDao;
+
+	public void query(String openId) {
+		
+	}
+	
+	public List<QueryStudentListVo> queryStudent(String classId) {
+		String sql = "SELECT student.photo,qp.open_id,student.student_id,student.student_name,qp.tel,qp.relation,qpsc.class_name "
+				+ "FROM qm_play_school_class AS qpsc JOIN qm_class_student AS classStudnet "
+				+ "JOIN qm_student AS student JOIN qm_patriarch AS qp JOIN qm_patriarch_student AS qps "
+				+ "WHERE classStudnet.student_id = student.student_id AND qps.student_id = student.student_id "
+				+ "AND qps.patriarch_id = qp.id AND qpsc.class_id = classStudnet.class_id AND classStudnet.class_id in "+classId+" and student.status=0";
+		@SuppressWarnings("unchecked")
+		List<QueryStudentListVo> findList = (List<QueryStudentListVo>) this.findList(sql, new Object[] {},
+				QueryStudentListVo.class);
+		return findList;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public List<QueryStudentListVo> queryClassIdByTeacherId(Long teacherId) {
+		String sql="SELECT qct.class_id FROM qm_play_school_teacher AS qpst JOIN qm_class_teacher AS qct " + 
+				"WHERE qpst.teacher_id = qct.teacher_id AND qpst.teacher_id =?";
+		List<QuerySchoolClassVo> findList = (List<QuerySchoolClassVo>) this.findList(sql, new Object[] {teacherId}, QuerySchoolClassVo.class);
+		List<QueryStudentListVo> queryStudent = new ArrayList<>();
+		if(findList.size()>0) {
+			List<String> li=new ArrayList<>();
+			for(QuerySchoolClassVo vo:findList) {
+				li.add(vo.getClassId().toString());
+			}
+			String join = String.join(",",li);
+			queryStudent = this.queryStudent("("+join+")");
+		}
+		return queryStudent;
+	}
+
+	public void studentAdd(StudentSupplyVo vo) {
+		QmPatriarch patriarch = new QmPatriarch();
+		patriarch.setTel(vo.getTel());
+		patriarch.setRelation(vo.getRelation());
+		patriarch.setPostTime(Calendar.getInstance().getTime());
+		QmPatriarch save = patriarchDao.save(patriarch);
+
+		QmStudent student = new QmStudent();
+		student.setSex(vo.getSex());
+		student.setStudentName(vo.getStudentName());
+		student.setStatus(0);// 0-启用 1-冻结
+		student.setPostTime(Calendar.getInstance().getTime());
+		QmStudent save2 = studentDao.save(student);
+
+		QmPatriarchStudent patriarchStudent = new QmPatriarchStudent();
+		patriarchStudent.setPatriarchId(save.getId());
+		patriarchStudent.setStudentId(save2.getStudentId());
+		patriarchStudent.setPostTime(Calendar.getInstance().getTime());
+		patriarchStudentDao.save(patriarchStudent);
+
+		QmClassStudent classStudent = new QmClassStudent();
+		classStudent.setClassId(vo.getClassId());
+		classStudent.setStudentId(save2.getStudentId());
+		classStudent.setPostTime(Calendar.getInstance().getTime());
+		classDao.save(classStudent);
+	}
+
+	@SuppressWarnings("unchecked")
+	public List<QueryStudentSupplyVo> queryStudentSupply(String tele) {
+		String sql = "SELECT sd.student_name,sd.sex,qp.tel,qp.relation,qpsc.class_name,sd.student_id,"
+				+ "qp.id as patriarchId,qps.id as patriarchStudentId "
+				+ "FROM qm_student AS sd LEFT JOIN qm_patriarch_student AS qps on sd.student_id=qps.student_id and sd.status=0"
+				+ "LEFT JOIN qm_patriarch AS qp on qps.patriarch_id=qp.id "
+				+ "LEFT JOIN qm_class_student AS qcs on qcs.student_id=sd.student_id "
+				+ "LEFT JOIN qm_play_school_class AS qpsc on qpsc.class_id=qcs.class_id WHERE qp.tel=?";
+		List<QueryStudentSupplyVo> findList = (List<QueryStudentSupplyVo>) this.findList(sql, new Object[] { tele },
+				QueryStudentSupplyVo.class);
+		return findList;
+	}
+
+	@SuppressWarnings("unchecked")
+	public Map<String,Object> studentSupply(StudentSupplyVo vo) throws Exception {
+		String sql="SELECT qps.* FROM qm_patriarch AS qp JOIN qm_patriarch_student as qps " + 
+				"where qp.id=qps.patriarch_id AND qp.tel= ?";
+		List<QmPatriarchStudent> findList = (List<QmPatriarchStudent>) this.findList(sql, new Object[] {vo.getTel()}, QmPatriarchStudent.class);
+		QmPatriarch patriarch = new QmPatriarch();
+		patriarch.setId(findList.get(0).getPatriarchId());
+		patriarch.setTel(vo.getTel());
+		patriarch.setRelation(vo.getRelation());
+		patriarch.setOpenId(vo.getOpenId());
+		patriarch.setPostTime(Calendar.getInstance().getTime());
+		patriarchDao.save(patriarch);
+		QmAccount qa=new QmAccount();
+		QmAccount account = accountDao.findByOpenId(vo.getOpenId());
+		if(account!=null) {
+			BeanUtils.copyProperties(account, qa);
+			qa.setRoleId(findList.get(0).getStudentId());
+			qa.setPersonType(3);
+			qa.setPostTime(Calendar.getInstance().getTime());
+			accountDao.save(qa);
+		}
+//		QmPatriarchStudent patriarchStudent = new QmPatriarchStudent();
+//		patriarchStudent.setPatriarchId(patriarch.getId());
+//		patriarchStudent.setStudentId(findList.get(0).getStudentId());
+//		patriarchStudent.setId(findList.get(0).getId());
+//		patriarchStudent.setPostTime(Calendar.getInstance().getTime());
+//		patriarchStudentDao.save(patriarchStudent);
+		QmStudent student = new QmStudent();
+		student.setSex(vo.getSex());
+		student.setStatus(0);
+		student.setPhoto(account.getPhoto());
+		student.setStudentName(vo.getStudentName());
+		student.setStudentId(findList.get(0).getStudentId());
+		student.setPostTime(Calendar.getInstance().getTime());
+		studentDao.save(student);
+		Map<String,Object> map=new HashMap<>();
+		map.put("roleType", 3);
+		map.put("id", patriarch.getId());
+		return map;
+	}
+
+	@SuppressWarnings("unchecked")
+	public List<QueryStudentVo> studentQuery(String openId) throws Exception {
+		String sql = "SELECT qp.open_id,student.student_id,student.sex,student.student_name,qp.tel,qp.relation,"
+				+ "psc.class_name,psc.class_id FROM qm_patriarch AS qp LEFT JOIN qm_patriarch_student AS qps ON qp.id = qps.patriarch_id "
+				+ "LEFT JOIN qm_student AS student ON qps.student_id = student.student_id AND student. STATUS = 0 "
+				+ "LEFT JOIN qm_class_student AS cs ON student.student_id = cs.student_id "
+				+ "LEFT JOIN qm_play_school_class AS psc ON cs.class_id = psc.class_id WHERE qp.open_id = ?";
+		List<QueryStudentVo> findList = (List<QueryStudentVo>) this.findList(sql, new Object[] { openId },
+				QueryStudentVo.class);
+		return findList;
+	}
+	@SuppressWarnings("unchecked")
+	public List<QueryStudentVo> studentQueryInfo(String tel) throws Exception {
+		String sql = "SELECT qp.open_id,student.student_id,student.sex,student.student_name,qp.tel,qp.relation,"
+				+ "psc.class_name,psc.class_id FROM qm_patriarch AS qp LEFT JOIN qm_patriarch_student AS qps ON qp.id = qps.patriarch_id "
+				+ "LEFT JOIN qm_student AS student ON qps.student_id = student.student_id AND student. STATUS = 0 "
+				+ "LEFT JOIN qm_class_student AS cs ON student.student_id = cs.student_id "
+				+ "LEFT JOIN qm_play_school_class AS psc ON cs.class_id = psc.class_id WHERE qp.tel = ?";
+		List<QueryStudentVo> findList = (List<QueryStudentVo>) this.findList(sql, new Object[] { tel },
+				QueryStudentVo.class);
+		return findList;
+	}
+	
+	public Integer studentBatchAdd(File file) {
+		List<List<String>> readExcel = FilerReadExcel.readExcel(file);
+		for (List<String> obj : readExcel) {
+			QmStudent qs = new QmStudent();
+			QmPatriarch qp = new QmPatriarch();
+			QmPatriarchStudent qps = new QmPatriarchStudent();
+			qs.setSex(Integer.parseInt(obj.get(1)));
+			qs.setStatus(0);
+			qs.setStudentName(obj.get(0));
+			qs.setPostTime(Calendar.getInstance().getTime());
+			studentDao.save(qs);
+
+			qp.setRelation(Integer.parseInt(obj.get(3)));
+			qp.setTel(obj.get(2));
+			qp.setPostTime(Calendar.getInstance().getTime());
+			patriarchDao.save(qp);
+
+			qps.setPatriarchId(qp.getId());
+			qps.setStudentId(qs.getStudentId());
+			qps.setPostTime(Calendar.getInstance().getTime());
+			patriarchStudentDao.save(qps);
+		}
+		return readExcel.size();
+
+	}
+
+	public void studentUpdate(QueryStudentVo vo) throws ServiceException {
+		QmStudent student = studentDao.findByStudentId(vo.getStudentId());
+		QmStudent qs=new QmStudent();
+		BeanUtils.copyProperties(student, qs);
+		qs.setStudentName(vo.getStudentName());
+		qs.setSex(vo.getSex());
+		qs.setPostTime(Calendar.getInstance().getTime());
+		studentDao.save(qs);
+		QmPatriarchStudent findByStudentId = patriarchStudentDao.findByStudentId(vo.getStudentId());
+		QmPatriarch patriarch = patriarchDao.findOne(findByStudentId.getPatriarchId());
+		QmPatriarch qp=new QmPatriarch();
+		BeanUtils.copyProperties(patriarch, qp);
+		qp.setRelation(vo.getRelation());
+		qp.setPostTime(Calendar.getInstance().getTime());
+		patriarchDao.save(qp);
+		QmClassStudent classStudent = classDao.findByStudentId(vo.getStudentId());
+		QmClassStudent qcs=new QmClassStudent();
+		BeanUtils.copyProperties(classStudent, qcs);
+		qcs.setPostTime(Calendar.getInstance().getTime());
+		qcs.setClassId(vo.getClassId());
+		classDao.save(qcs);
+	}
+	
+	public void studentDelete(Long studentId) throws ServiceException {
+		QmStudent student = studentDao.findByStudentId(studentId);
+		QmStudent qs=new QmStudent();
+		BeanUtils.copyProperties(student, qs);
+		qs.setStatus(1);
+		studentDao.save(qs);
+		QmClassStudent findByStudentId = classDao.findByStudentId(studentId);
+		if(findByStudentId!=null) {
+			classDao.delete(findByStudentId.getId());
+		}
+	}
+	@Override
+	public JPADao<QmStudent> getDao() {
+		return studentDao;
+	}
+
+	@Override
+	public Class<QmStudent> getEntityClass() {
+		return QmStudent.class;
+	}
+}

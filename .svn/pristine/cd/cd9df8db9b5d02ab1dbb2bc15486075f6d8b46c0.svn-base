@@ -1,0 +1,235 @@
+package com.qxiao.wx.user.util;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Random;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import com.qxiao.wx.notice.jpa.dao.QmNoticeInfoDao;
+import com.qxiao.wx.notice.jpa.entity.QmNoticeInfo;
+import com.qxiao.wx.user.jpa.dao.QmMessageSendDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolClassDao;
+import com.qxiao.wx.user.jpa.entity.QmMessageSend;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.jpa.service.PunchService;
+import com.talkweb.weixin.main.StartOnLoad;
+import com.talkweb.weixin.pojo.AccessToken;
+import com.talkweb.weixin.util.WeiXinUtil;
+
+import net.sf.json.JSONObject;
+
+/**
+ * 基于spring的定时器任务
+ * 
+ * @author xiaojiao
+ *
+ * @创建时间：2018年11月8日
+ */
+@Component
+public class MyTask {
+
+	private Logger log = Logger.getLogger(MyTask.class);
+
+	private SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+
+	private String url1 = "http://232a9x6385.51mypc.cn/#/notice/show?noticeId=";
+	private String url2 = "http://232a9x6385.51mypc.cn/#/fresh/show?freshId=";
+	private String url5 = "http://232a9x6385.51mypc.cn/#/homework/show?homeId=";
+
+	private static int count = 0;
+
+	@Autowired
+	PunchService punService;
+	@Autowired
+	private QmNoticeInfoDao infoDao;
+	@Autowired
+	private QmMessageSendDao messageDao;
+	@Autowired
+	QmPlaySchoolClassDao classDao;
+
+	/**
+	 * 每分钟执行一次
+	 */
+	@Scheduled(cron = "0 0/1 * * * ? ")
+	public void clockSendMessage() {
+		Date time = null;
+		try {
+			String fm = format.format(new Date());
+			time = format.parse(fm);
+			List<QmNoticeInfo> notices = infoDao.findByClockTime(time);
+			if (CollectionUtils.isNotEmpty(notices)) {
+				for (QmNoticeInfo info : notices) {
+					info.setMessageSend(1);
+				}
+				infoDao.save(notices);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.info("通知推送失败：" + e.getMessage() + ", 时间：" + time);
+		}
+	}
+
+	@Scheduled(cron = "0/20 * * * * ?")
+	public void sendTempLateMessage() {
+
+		if (count == 0) {
+			this.executeThread();
+		}
+		if (count == Integer.MAX_VALUE) {
+			count = 1;
+		}
+		count++;
+	}
+
+	/**
+	 * 每天7点5分 -19点 每隔5分钟执行一次
+	 */
+	@Scheduled(cron = "0 0 21 ? * *")
+	public void saveClockStat() {
+
+		try {
+			String format = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
+			punService.saveClockStat(format);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.info("定时器异常：" + e.getMessage());
+		}
+	}
+
+	public void executeThread() {
+		SendMsg1 msg = new SendMsg1();
+		msg.start();
+	}
+
+	public class SendMsg1 extends Thread {
+
+		@Override
+		public void run() {
+			while (true) {
+				try {
+					AccessToken accessToken = StartOnLoad.tokenThread1.accessToken;
+					// System.out.println("accessToken=="+accessToken.token);
+					if (accessToken == null) {
+						Thread.sleep(1 * 1000);
+						continue;
+					}
+
+					// 随机停2000毫秒-10000毫秒
+					Random rand = new Random();
+					Thread.sleep(rand.nextInt(8000) + 2000);
+
+					List<QmMessageSend> notice1 = messageDao.findByType(1);
+					if (CollectionUtils.isNotEmpty(notice1)) {
+						this.message(notice1, accessToken.token, StartOnLoad.TEMPLATE_ID, url1);
+					}
+
+					List<QmMessageSend> fresh = messageDao.findByType(2);
+					if (CollectionUtils.isNotEmpty(fresh)) {
+						this.message2(fresh, accessToken.token, StartOnLoad.TEMPLATE_ID, url2);
+					}
+
+					List<QmMessageSend> notice5 = messageDao.findByType(5);
+					if (CollectionUtils.isNotEmpty(notice5)) {
+						this.message2(notice5, accessToken.token, StartOnLoad.TEMPLATE_ID, url5);
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("SendMsgThread-run:" + e.getMessage());
+				}
+			}
+		}
+
+		private void message(List<QmMessageSend> message, String token, String temlateId, String url) {
+			try {
+				if (CollectionUtils.isNotEmpty(message)) {
+					for (QmMessageSend qms : message) {
+						JSONObject data = new JSONObject();
+						JSONObject value = new JSONObject();
+						value.put("value", qms.getTitle());
+						value.put("color", "#FFA500");
+						data.put("keyword1", value);
+
+						value.put("value", qms.getTextContent());
+						value.put("color", "#000000");
+						data.put("keyword2", value);
+
+						value.put("value", qms.getPostTime());
+						value.put("color", "#000000");
+						data.put("keyword3", value);
+						WeiXinUtil.sendTemplateMsg3(token, qms.getOpenId(), url + qms.getMessageId(), temlateId, data);
+						qms.setResult(1);
+					}
+					messageDao.save(message);
+					Thread.sleep(2 * 1000);
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				log.error("SendMsgThread-run:" + e.getMessage());
+			}
+		}
+
+		private void message2(List<QmMessageSend> fresh, String token, String tEMPLATE_ID, String url2) {
+			try {
+				if (CollectionUtils.isNotEmpty(fresh)) {
+					for (QmMessageSend qms : fresh) {
+						List<QmPlaySchoolClass> patriarch = classDao.findWithPatriarch(qms.getOpenId());
+						if (patriarch.size() > 0) {
+							for (QmPlaySchoolClass qpsc : patriarch) {
+								JSONObject data = new JSONObject();
+								JSONObject value = new JSONObject();
+								value.put("value", qms.getTitle());
+								value.put("color", "#FFA500");
+								data.put("keyword1", value);
+
+								value.put("value", qms.getTextContent());
+								value.put("color", "#000000");
+								data.put("keyword2", value);
+
+								value.put("value", qms.getPostTime());
+								value.put("color", "#000000");
+								data.put("keyword3", value);
+								WeiXinUtil.sendTemplateMsg3(token, qms.getOpenId(), url2 + qms.getMessageId()+"&classId=" + qpsc.getClassId(),
+										tEMPLATE_ID, data);
+								qms.setResult(1);
+							}
+						}
+						List<QmPlaySchoolClass> teacher = classDao.findWithTeacher(qms.getOpenId());
+						if(teacher.size()>0) {
+							for (QmPlaySchoolClass qpsc : teacher) {
+								JSONObject data = new JSONObject();
+								JSONObject value = new JSONObject();
+								value.put("value", qms.getTitle());
+								value.put("color", "#FFA500");
+								data.put("keyword1", value);
+
+								value.put("value", qms.getTextContent());
+								value.put("color", "#000000");
+								data.put("keyword2", value);
+
+								value.put("value", qms.getPostTime());
+								value.put("color", "#000000");
+								data.put("keyword3", value);
+								WeiXinUtil.sendTemplateMsg3(token, qms.getOpenId(), url2 + qms.getMessageId()+"&classId=" + qpsc.getClassId(),
+										tEMPLATE_ID, data);
+								qms.setResult(1);
+							}
+						}
+						messageDao.save(fresh);
+						Thread.sleep(2 * 1000);
+					}
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				log.error("SendMsgThread-run:" + e.getMessage());
+			}
+		}
+	}
+
+}

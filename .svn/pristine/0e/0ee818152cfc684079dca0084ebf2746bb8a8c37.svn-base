@@ -1,0 +1,90 @@
+package com.qxiao.wx.user.jpa.entity;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+@Entity
+public class QmRecipeInfo {
+	@Id
+	@GeneratedValue
+	private Long recipeId;
+	private Date startDate;
+	private Date endDate;
+	private String title;
+	private String textContent;
+	private int isDel;
+	private int personType;
+	private Long personId;
+	private Date postTime;
+	private int messageSend;
+	private Date sendTime;
+	public Long getRecipeId() {
+		return recipeId;
+	}
+	public void setRecipeId(Long recipeId) {
+		this.recipeId = recipeId;
+	}
+	public Date getStartDate() {
+		return startDate;
+	}
+	public void setStartDate(Date startDate) {
+		this.startDate = startDate;
+	}
+	public Date getEndDate() {
+		return endDate;
+	}
+	public void setEndDate(Date endDate) {
+		this.endDate = endDate;
+	}
+	public String getTitle() {
+		return title;
+	}
+	public void setTitle(String title) {
+		this.title = title;
+	}
+	public String getTextContent() {
+		return textContent;
+	}
+	public void setTextContent(String textContent) {
+		this.textContent = textContent;
+	}
+	public int getIsDel() {
+		return isDel;
+	}
+	public void setIsDel(int isDel) {
+		this.isDel = isDel;
+	}
+	public int getPersonType() {
+		return personType;
+	}
+	public void setPersonType(int personType) {
+		this.personType = personType;
+	}
+	public Long getPersonId() {
+		return personId;
+	}
+	public void setPersonId(Long personId) {
+		this.personId = personId;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+	public int getMessageSend() {
+		return messageSend;
+	}
+	public void setMessageSend(int messageSend) {
+		this.messageSend = messageSend;
+	}
+	public Date getSendTime() {
+		return sendTime;
+	}
+	public void setSendTime(Date sendTime) {
+		this.sendTime = sendTime;
+	}
+	
+}

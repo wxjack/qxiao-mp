@@ -1,0 +1,44 @@
+package com.qxiao.wx.community.jpa.service.impl;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.community.jpa.dao.QmCommunityPraiseDao;
+import com.qxiao.wx.community.jpa.entity.QmCommunityPraise;
+import com.qxiao.wx.community.jpa.service.IQmCommunityPraiseService;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+
+@Service
+public class QmCommunityPariseServiceImpl extends AbstractJdbcService<QmCommunityPraise>
+		implements IQmCommunityPraiseService {
+
+	@Autowired
+	private QmCommunityPraiseDao praiseDao;
+
+	@Override
+	public JPADao<QmCommunityPraise> getDao() {
+		return praiseDao;
+	}
+
+	@Override
+	public Class<QmCommunityPraise> getEntityClass() {
+		return QmCommunityPraise.class;
+	}
+
+	@Override
+	public void communityPraise(String openId, Long communityId) {
+		QmCommunityPraise praise = praiseDao.findByCommunityIdAndOpenId(communityId, openId);
+		if (praise == null) {
+			praise = new QmCommunityPraise();
+			praise.setCommunityId(communityId);
+			praise.setOpenId(openId);
+			praise.setPostTime(new Date());
+			praiseDao.save(praise);
+		}else {
+			praiseDao.delete(praise.getPraiseId());
+		}
+	}
+}

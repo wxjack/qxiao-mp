@@ -1,0 +1,208 @@
+package com.qxiao.wx.notice.sqlconst;
+
+/**
+ * SQL 语句
+ * 
+ * @author xiaojiao
+ *
+ * @创建时间：2018年12月27日
+ */
+public class SQLConst {
+
+// 查询发送到班级的通知  + 老师的通知、老师端 O
+	public static String teacherQuery() {
+		String sql = "SELECT * FROM ( ( SELECT qni1.notice_id AS noticeId, qni1.title AS title, "
+				+ "qni1.text_content AS textContent, qni1.need_confirm AS needConfirm, "
+				+ "( SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_notice_sender qs ON qs.notice_id = q.notice_id WHERE qs.sender_type = 1 "
+				+ "AND qs.sender_id = qns1.sender_id ) AS classReadCount, ( "
+				+ "SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_notice_sender qs ON qs.notice_id = q.notice_id  WHERE qs.sender_type = 1 "
+				+ "AND q.confirm_flag = 1 AND qs.sender_id = qns1.sender_id "
+				+ ") AS classConfirmCount, ( SELECT COUNT(stu.student_id) "
+				+ "FROM  qm_student stu JOIN qm_class_student cl ON cl.student_id = stu.student_id "
+				+ "WHERE cl.class_id = qns1.sender_id ) - ( SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_notice_sender qs ON qs.notice_id = q.notice_id  WHERE qs.sender_type = 1 "
+				+ "AND q.confirm_flag = 1 AND qs.sender_id = qns1.sender_id "
+				+ ") AS classUnreadCount, qni1.post_time AS postTime FROM qm_notice_info AS qni1 "
+				+ "LEFT JOIN qm_notice_read_confirm AS qr1 ON qr1.notice_id = qni1.notice_id "
+				+ "LEFT JOIN qm_notice_sender AS qns1 ON qns1.notice_id = qni1.notice_id "
+				+ "LEFT JOIN qm_class_student AS qst1 ON qr1.student_id = qst1.student_id "
+				+ "WHERE qni1.is_del = 0 AND qni1.clock_time IS NULL "
+				+ "AND qns1.sender_type = 1 AND qns1.sender_id = ? GROUP BY noticeId ) UNION ( SELECT "
+				+ "qni2.notice_id AS noticeId, qni2.title AS title, qni2.text_content AS textContent, "
+				+ "0 AS classReadCount, 0 AS classConfirmCount, 0 AS classUnreadCount, "
+				+ "qni2.need_confirm AS needConfirm, qni2.post_time AS postTime FROM qm_notice_info AS qni2 "
+				+ "JOIN qm_notice_sender AS qns2 ON qni2.notice_id = qns2.notice_id "
+				+ "JOIN qm_play_school_teacher AS qpst2 ON qns2.sender_id = qpst2.teacher_id "
+				+ "WHERE qpst2.open_id = ? AND qni2.is_del = 0 "
+				+ "AND qns2.sender_type = 2 AND qni2.clock_time IS NULL GROUP BY noticeId )) AS temp ORDER BY "
+				+ "temp.postTime DESC ";
+		return sql;
+	}
+
+// 查询自己发布通告
+	public static String queryLeaderNotice() {
+		String sql = "SELECT temp.* FROM ((SELECT qni1.notice_id AS noticeId, qni1.title AS title, "
+				+ "qni1.text_content AS textContent, (SELECT COUNT(qntc1.student_id) "
+				+ "FROM qm_notice_read_confirm AS qntc1 WHERE qntc1.notice_id = qni1.notice_id "
+				+ ") AS classReadCount, (SELECT COUNT(qntc1.id) FROM qm_notice_read_confirm AS qntc1 WHERE "
+				+ "qntc1.notice_id = qni1.notice_id AND qntc1.confirm_flag = 1) AS classConfirmCount, "
+				+ "((SELECT COUNT(qs1.student_id) FROM qm_student AS qs1 "
+				+ "JOIN qm_class_student AS qcs1 ON qs1.student_id = qcs1.student_id "
+				+ "WHERE qcs1.class_id = qst1.class_id ) - (SELECT COUNT(qntc1.student_id) FROM "
+				+ "qm_notice_read_confirm AS qntc1 WHERE qntc1.notice_id = qni1.notice_id) "
+				+ ") AS classUnreadCount,qni1.confirm_flag AS needConfirm, qni1.post_time AS postTime FROM "
+				+ "qm_notice_info AS qni1 "
+				+ "LEFT JOIN qm_notice_read_confirm AS qr1 ON qr1.notice_id = qni1.notice_id "
+				+ "LEFT JOIN qm_notice_sender AS qns1 ON qns1.notice_id = qni1.notice_id "
+				+ "LEFT JOIN qm_class_student AS qst1 ON qns1.sender_id = qst1.class_id WHERE qni1.is_del = 0 "
+				+ "AND qni1.open_id = ? AND qns1.sender_type = 1  AND qni1.clock_time IS NULL GROUP BY noticeId "
+				+ ") UNION (SELECT qni2.notice_id AS noticeId, qni2.title AS title, "
+				+ "qni2.text_content AS textContent, 0 AS classReadCount,0 AS classConfirmCount, "
+				+ "0 AS classUnreadCount, qni2.confirm_flag AS needConfirm, qni2.post_time AS postTime FROM "
+				+ "qm_notice_info AS qni2 JOIN qm_notice_sender AS qns2 ON qni2.notice_id = qns2.notice_id "
+				+ "WHERE qni2.open_id = ? AND qni2.is_del = 0 AND qns2.sender_type = 2 "
+				+ "AND qni2.clock_time IS NULL GROUP BY noticeId )) AS temp ORDER BY temp.postTime DESC";
+		return sql;
+	}
+
+	// 园长查询所有 OK
+	public static String queryAll() {
+		String sql = "SELECT temp.* FROM ( ( SELECT qni1.notice_id AS noticeId, qni1.title AS title, "
+				+ "qni1.text_content AS textContent, IFNULL( ( SELECT COUNT(qntc1.student_id) "
+				+ "FROM qm_notice_read_confirm AS qntc1 WHERE qntc1.notice_id = qni1.notice_id "
+				+ "	), 0 ) AS classReadCount, 	IFNULL( ( SELECT COUNT(qntc1.id) FROM "
+				+ "	qm_notice_read_confirm AS qntc1 WHERE 	qntc1.notice_id = qni1.notice_id "
+				+ "AND qntc1.confirm_flag = 1 ),  0 ) AS classConfirmCount, IFNULL(  ( SELECT "
+				+ "	COUNT(qs1.student_id) FROM 	qm_student AS qs1 "
+				+ "JOIN qm_class_student AS qcs1 ON qs1.student_id = qcs1.student_id "
+				+ "JOIN qm_play_school_class qps1 ON qps1.class_id = qcs1.class_id "
+				+ "WHERE 	qps1.school_id = sch.school_id  ) - ( SELECT 	COUNT(qntc1.id) FROM "
+				+ "	qm_notice_read_confirm AS qntc1 WHERE 	qntc1.notice_id = qni1.notice_id  ), "
+				+ " 0 ) AS classUnreadCount, qni1.need_confirm AS needConfirm, qni1.post_time AS postTime "
+				+ "FROM qm_notice_info AS qni1 "
+				+ "LEFT JOIN qm_notice_read_confirm AS qr1 ON qr1.notice_id = qni1.notice_id "
+				+ "LEFT JOIN qm_notice_sender AS qns1 ON qns1.notice_id = qni1.notice_id "
+				+ "LEFT JOIN qm_play_school_class AS qst1 ON qns1.sender_id = qst1.class_id "
+				+ "LEFT JOIN qm_play_school_info sch ON sch.school_id = qst1.school_id WHERE qni1.is_del = 0 "
+				+ "AND sch.school_id = ? AND qni1.clock_time IS NULL AND qns1.sender_type = 1 GROUP BY "
+				+ "noticeId ) UNION ( SELECT qni2.notice_id AS noticeId, "
+				+ "qni2.title AS title, qni2.text_content AS textContent, 0 AS classReadCount, "
+				+ "0 AS classConfirmCount, 0 AS classUnreadCount, qni2.need_confirm AS needConfirm, "
+				+ "qni2.post_time AS postTime FROM qm_notice_info AS qni2 "
+				+ "JOIN qm_notice_sender AS qns2 ON qni2.notice_id = qns2.notice_id "
+				+ "JOIN qm_class_teacher AS qct2 ON qct2.teacher_id = qns2.sender_id "
+				+ "JOIN qm_play_school_class AS qpsc2 ON qpsc2.class_id = qct2.class_id "
+				+ "JOIN qm_play_school_info AS qpsi2 ON qpsi2.school_id = qpsc2.school_id WHERE "
+				+ "qpsi2.school_id = ? AND qni2.is_del = 0 AND qns2.sender_type = 2 "
+				+ "AND qni2.clock_time IS NULL GROUP BY noticeId ) ) AS temp ORDER BY 	temp.postTime DESC";
+		return sql;
+	}
+
+	public static String findWithClass() {
+		String sql = "SELECT qni.notice_id AS noticeId, qni.title AS title, "
+				+ "qni.text_content AS textContent, qni.confirm_flag AS needConfirm, IFNULL( ( "
+				+ "SELECT COUNT(student_id) FROM qm_notice_read_confirm "
+				+ "WHERE notice_id = qni.notice_id ), 0 ) AS classReadCount, "
+				+ "( IFNULL( (SELECT  COUNT(qnr.id) FROM "
+				+ "qm_notice_read_confirm AS qnr  WHERE qnr.notice_id = qni.notice_id "
+				+ "AND qnr.confirm_flag = 1 ), 0 ) ) AS classConfirmCount, IFNULL( ( SELECT "
+				+ "COUNT(a.student_id) FROM qm_class_student a "
+				+ "JOIN qm_play_school_class b on a.class_id = b.class_id WHERE "
+				+ "b.school_id = qpsc.school_id ) - ( SELECT COUNT(qnr.student_id) "
+				+ "FROM qm_notice_read_confirm AS qnr "
+				+ "JOIN qm_class_student AS stu ON qnr.student_id = stu.student_id "
+				+ "JOIN qm_play_school_class c ON c.class_id = stu.class_id  WHERE "
+				+ "c.school_id = qpsc.school_id ), 0 ) AS classUnreadCount, "
+				+ "qni.post_time AS postTime FROM qm_notice_info AS qni "
+				+ "LEFT JOIN qm_notice_sender AS qns ON qns.notice_id = qni.notice_id "
+				+ "LEFT JOIN qm_play_school_class AS qpsc ON qpsc.class_id = qns.sender_id "
+				+ "LEFT JOIN qm_class_student AS qcs ON qcs.class_id = qpsc.class_id "
+				+ "LEFT JOIN qm_notice_read_confirm AS qr ON qr.notice_id = qni.notice_id WHERE "
+				+ "qni.notice_id = ? AND qni.is_del = 0  "
+				+ "AND qpsc.school_id = ? AND qns.sender_type = 1 GROUP BY qni.notice_id";
+		return sql;
+	}
+
+	// O
+	public static String findSendClass() {
+		String sql = "SELECT qni.notice_id AS noticeId, qni.title AS title, "
+				+ "SUBSTRING(qni.text_content, 1, 50) AS textContent, qni.need_confirm AS needConfirm, "
+				+ "( SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_notice_sender qs ON qs.notice_id = q.notice_id WHERE "
+				+ "qs.sender_type = 1 AND qs.sender_id = qns.sender_id "
+				+ ") AS classReadCount, ( SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_notice_sender qs ON qs.notice_id = q.notice_id WHERE "
+				+ "qs.sender_type = 1 AND q.confirm_flag = 1 "
+				+ "AND qs.sender_id = qns.sender_id ) AS classConfirmCount, ( SELECT "
+				+ "COUNT(stu.student_id) FROM qm_student stu "
+				+ "JOIN qm_class_student cl ON cl.student_id = stu.student_id WHERE "
+				+ "cl.class_id = qns.sender_id ) - ( SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_notice_sender qs ON qs.notice_id = q.notice_id WHERE "
+				+ "qs.sender_type = 1 AND q.confirm_flag = 1 "
+				+ "AND qs.sender_id = qns.sender_id ) AS classUnreadCount, "
+				+ "qni.post_time AS postTime FROM qm_notice_info AS qni "
+				+ "LEFT JOIN qm_notice_read_confirm AS qr ON qr.notice_id = qni.notice_id "
+				+ "LEFT JOIN qm_notice_sender AS qns ON qns.notice_id = qni.notice_id "
+				+ "LEFT JOIN qm_class_student AS qst ON qr.student_id = qst.student_id WHERE qni.is_del = 0 "
+				+ " AND qns.sender_id = ? AND qns.sender_type = 1 "
+				+ "AND qni.clock_time IS NULL GROUP BY noticeId ORDER BY postTime DESC";
+		return sql;
+	}
+
+	public static String findWithTeacher() {
+		String sql = "SELECT qni.notice_id AS noticeId, qni.title AS title, qni.text_content AS textContent, "
+				+ "qni.need_confirm AS needConfirm, 0 AS classReadCount, 0 AS classConfirmCount, "
+				+ "0 AS classUnreadCount, qni.post_time AS postTime FROM qm_notice_info AS qni "
+				+ "JOIN qm_notice_sender AS qns ON qns.notice_id = qni.notice_id WHERE qni.notice_id = ? "
+				+ "AND qni.is_del = 0  AND qns.sender_type = 2 "
+				+ "AND qns.sender_id = ? AND qni.clock_time IS NULL GROUP BY noticeId order by postTime desc";
+		return sql;
+	}
+
+	// O
+	public static String findWithPatriarch() {
+		String sql = "SELECT qni.notice_id AS noticeId, qni.title AS title, "
+				+ "qni.text_content AS textContent, qni.need_confirm AS needConfirm, ( SELECT "
+				+ "COUNT(a.student_id) FROM	qm_notice_read_confirm a "
+				+ "JOIN qm_class_student AS b ON a.student_id = b.student_id WHERE "
+				+ "b.class_id = qns.sender_id AND a.notice_id = qni.notice_id "
+				+ ") AS classReadCount, ( SELECT COUNT(q.id) FROM qm_notice_read_confirm AS q "
+				+ "JOIN qm_class_student stu ON stu.student_id = q.student_id WHERE "
+				+ "q.confirm_flag = 1 AND stu.class_id = qns.sender_id ) AS classConfirmCount, ( ( 	SELECT "
+				+ "COUNT(q.id) FROM qm_class_student q WHERE q.class_id = qns.sender_id ) - ( SELECT "
+				+ "COUNT(a.student_id) FROM qm_notice_read_confirm a "
+				+ "JOIN qm_class_student AS b ON a.student_id = b.student_id WHERE "
+				+ "b.class_id = qns.sender_id AND a.notice_id = qni.notice_id "
+				+ ") ) AS classUnreadCount, qni.post_time AS postTime FROM "
+				+ "qm_notice_info AS qni JOIN qm_notice_sender AS qns ON qni.notice_id = qns.notice_id "
+				+ "JOIN qm_notice_read_confirm AS qr ON qr.notice_id = qni.notice_id "
+				+ "JOIN qm_class_student AS qst ON qr.student_id = qst.student_id WHERE qni.notice_id = ? "
+				+ "AND qns.sender_type = 1 AND qns.sender_id = ? AND qni.clock_time IS NULL "
+				+ "AND qni.is_del = 0 GROUP BY qni.notice_id ";
+		return sql;
+	}
+
+	public static String findReadersInfo() {
+		String sql = "SELECT qs.student_id AS studentId, qs.student_name AS studentName, qs.photo AS photo, "
+				+ "qp.relation AS relation, qnr.confirm_flag AS confirmFlag, qnr.post_time AS postTime "
+				+ "FROM qm_student AS qs LEFT JOIN qm_notice_read_confirm AS qnr ON qs.student_id = qnr.student_id "
+				+ "LEFT JOIN qm_class_student AS qcs ON qs.student_id = qcs.student_id "
+				+ "LEFT JOIN qm_patriarch_student AS qps ON qs.student_id = qps.student_id "
+				+ "LEFT JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id "
+				+ "LEFT JOIN qm_notice_info AS qni ON qni.notice_id = qnr.notice_id "
+				+ "WHERE qcs.class_id = ? AND qnr.notice_id = ? AND qni.is_del = 0 ";
+		return sql;
+	}
+
+	public static String findWithSchool() {
+		String sql = "SELECT qni.notice_id AS noticeId, qni.title AS title, "
+				+ "qni.text_content AS textContent,qni.need_confirm AS needConfirm, "
+				+ "0 AS classReadCount, 0 AS classConfirmCount, 0 AS classUnreadCount, "
+				+ "qni.post_time AS postTime FROM qm_notice_info AS qni WHERE "
+				+ "qni.notice_id = ? AND qni.is_del = 0 ";
+		return sql;
+	}
+
+}

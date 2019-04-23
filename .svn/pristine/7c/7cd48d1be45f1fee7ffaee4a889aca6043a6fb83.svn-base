@@ -1,0 +1,90 @@
+package com.qxiao.wx.user.jpa.service.impl;
+
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.user.jpa.dao.QmAccountDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolClassDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmTeleVerifyCodeDao;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.jpa.service.SchoolAddService;
+import com.qxiao.wx.user.vo.SchoolAddVo;
+import com.qxiao.wx.user.vo.UpdateSchoolVo;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+
+@Service
+public class SchoolAddServiceImpl extends AbstractJdbcService<QmPlaySchoolInfoDao> implements SchoolAddService {
+
+	@Autowired
+	QmPlaySchoolInfoDao infoDao;
+	@Autowired
+	QmPlaySchoolClassDao classDao;
+	@Autowired
+	QmTeleVerifyCodeDao codeDao;
+	@Autowired
+	QmAccountDao accountDao;
+
+	public void updateSchool(UpdateSchoolVo vo) {
+		QmPlaySchoolInfo info = new QmPlaySchoolInfo();
+		BeanUtils.copyProperties(info, vo);
+		info.setPostTime(Calendar.getInstance().getTime());
+		infoDao.save(info);
+	}
+
+	public Map<String, Object> schoolAdd(SchoolAddVo vo) {
+		QmPlaySchoolInfo info = new QmPlaySchoolInfo();
+		// String valueOf = String.valueOf(Calendar.getInstance().getTimeInMillis());
+		// String substring = valueOf.substring(valueOf.length()-8);//需要改
+		String substring = RandomStringUtils.random(8, "1234567890");
+		BeanUtils.copyProperties(vo, info);
+		info.setPostTime(Calendar.getInstance().getTime());
+		info.setSchoolCode(substring);
+		info.setLeaderName(vo.getLeadName());
+		QmPlaySchoolInfo save = infoDao.save(info);
+		QmAccount qa=new QmAccount();
+		QmAccount account = accountDao.findByOpenId(vo.getOpenId());
+		if(account!=null) {
+			BeanUtils.copyProperties(account, qa);
+			qa.setRoleId(save.getSchoolId());
+			qa.setPersonType(0);
+			qa.setPostTime(Calendar.getInstance().getTime());
+			accountDao.save(qa);
+		}
+		List<Map<String, String>> classes = vo.getClasses();
+		if (classes.size() > 0) {
+			for (Map<String, String> cs : classes) {
+				QmPlaySchoolClass clas = new QmPlaySchoolClass();
+				clas.setClassName(cs.get("className"));
+				clas.setSchoolId(save.getSchoolId());
+				clas.setPostTime(Calendar.getInstance().getTime());
+				classDao.save(clas);
+			}
+		}
+		Map<String, Object> map = new HashMap<>();
+		map.put("id", save.getSchoolId());
+		map.put("schoolCode", save.getSchoolCode());
+		map.put("roleType", 1);
+		return map;
+	}
+
+	@Override
+	public JPADao<QmPlaySchoolInfoDao> getDao() {
+		return null;
+	}
+
+	@Override
+	public Class<QmPlaySchoolInfoDao> getEntityClass() {
+		return null;
+	}
+}

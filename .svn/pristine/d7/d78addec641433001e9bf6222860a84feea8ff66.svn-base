@@ -1,0 +1,18 @@
+package com.qxiao.wx.user.util;
+
+import java.util.Calendar;
+
+import org.apache.commons.lang3.RandomStringUtils;
+
+public class Test {
+	public static void main(String[] args) {
+
+		long millis = Calendar.getInstance().getTimeInMillis();
+		System.out.println(millis);
+		String valueOf = String.valueOf(millis);
+		String substring = valueOf.substring(valueOf.length()-8);
+		System.out.println(substring);
+		String random = RandomStringUtils.random(8, "1234567890");
+		System.out.println(random);
+	}
+}

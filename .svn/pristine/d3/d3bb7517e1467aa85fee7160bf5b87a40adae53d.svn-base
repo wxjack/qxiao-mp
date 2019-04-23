@@ -1,0 +1,174 @@
+package com.qxiao.wx.community.controller;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.qxiao.wx.community.dto.QmCommunityInfoDTO;
+import com.qxiao.wx.community.jpa.entity.QmCommunityComment;
+import com.qxiao.wx.community.jpa.service.IQmCommunityCommentServicve;
+import com.qxiao.wx.community.jpa.service.IQmCommunityInfoService;
+import com.qxiao.wx.community.jpa.service.IQmCommunityPraiseService;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.service.IQmAccountService;
+import com.spring.entity.DataPage;
+import com.spring.web.controller.ResponseMessage;
+import com.spring.web.utils.HttpServletRequestBody;
+
+@CrossOrigin
+@RestController
+@RequestMapping(value = "action/mod-xiaojiao/community")
+public class QmCommunityInfoController {
+
+	private Logger log = Logger.getLogger(QmCommunityInfoController.class);
+
+	@Autowired
+	private IQmCommunityInfoService communityInfoService;
+	@Autowired
+	private IQmAccountService accountService;
+	@Autowired
+	private IQmCommunityPraiseService praiseService;
+	@Autowired
+	private IQmCommunityCommentServicve commentService;
+
+	// 班级圈信息查询
+	@PostMapping(value = "/communityQuery.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage communityQuery(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		JSONObject json = null;
+		Long classId = null;
+		try {
+			json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				classId = json.getLong("classId");
+				int page = json.getInt("page");
+				int pageSize = json.getInt("pageSize");
+				DataPage<QmCommunityInfoDTO> list = communityInfoService.findByClassId(openId, classId,page,pageSize);
+				res.setData(list);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage() + "{}" + classId);
+		}
+		return res;
+	}
+
+	// 新增班级圈
+	@PostMapping(value = "/communityAdd.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage addCommunity(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null && json != null) {
+				String textContent = json.getString("textContent");
+				JSONArray images = json.getJSONArray("images");
+				String video = json.getString("video");
+				int contentType = json.getInt("contentType");
+				Long classId = json.getLong("classId");
+				communityInfoService.addCommunityInfo(openId, textContent, images, video, contentType, classId);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 发表评论
+	@PostMapping(value = "/communityComment.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage communityComment(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null && json != null) {
+				String textContent = json.getString("textContent");
+				Long communityId = json.getLong("communityId");
+				QmCommunityComment comment = commentService.addCommunityComment(openId, textContent, communityId);
+				Map<String, Long> map = new HashMap<>();
+				map.put("commentId", comment.getCommentId());
+				res.setData(map);
+				res.setErrorMsg("评论成功！");
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 点赞
+	@PostMapping(value = "/communityPraise.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage addCommunityPraise(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null && json != null) {
+				Long communityId = json.getLong("communityId");
+				praiseService.addCommunityPraise(openId, communityId);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg("系统异常！__" + e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 删除评论
+	@PostMapping(value = "/communityDelete.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage communityDelete(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null && json != null) {
+				Long communityId = json.getLong("communityId");
+				communityInfoService.deleteCommuityInfo(openId, communityId);
+				res.setErrorMsg("删除成功！");
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+}

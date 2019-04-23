@@ -1,0 +1,57 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd  
+        http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.1.xsd  
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd  
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.1.xsd  
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.1.xsd  
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.1.xsd  
+        http://www.springframework.org/schema/data/jpa http://www.springframework.org/schema/data/jpa/spring-jpa-1.3.xsd"
+	default-lazy-init="true">
+
+	<!-- JPA实体管理工厂的配置 -->
+	<bean id="jpa-entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="jpaVendorAdapter"
+			ref="jpa-hibernateJpaVendorAdapter" />
+		<property name="packagesToScan" value="**.jpa.**.entity" />
+		<property name="jpaProperties">
+			<props>
+				<prop key="hibernate.ejb.naming_strategy">org.hibernate.cfg.ImprovedNamingStrategy</prop>
+				<prop key="hibernate.show_sql">false</prop>
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+			</props>
+		</property>
+	</bean>
+
+	<!--指定实现JPA的适配器 -->
+	<bean id="jpa-hibernateJpaVendorAdapter"
+		class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+		<property name="databasePlatform"
+			value="${hibernate.dialect}" />
+	</bean>
+
+	<!-- Jpa 事务配置 -->
+	<bean id="jpa-transactionManager"
+		class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory"
+			ref="jpa-entityManagerFactory" />
+	</bean>
+
+	<!-- 加上后就可以使用public AccountInfo findByAccountId(Long accountId); -->
+	<jpa:repositories base-package="**.jpa.**.dao"
+		entity-manager-factory-ref="jpa-entityManagerFactory"
+		transaction-manager-ref="jpa-transactionManager" />
+
+	<!-- 使用annotation定义事务 -->
+	<tx:annotation-driven
+		transaction-manager="jpa-transactionManager" proxy-target-class="true" />
+
+</beans>

@@ -1,0 +1,80 @@
+package com.qxiao.wx.user.jpa.entity;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+@Entity
+public class QmPlaySchoolTeacher {
+	@Id
+	@GeneratedValue
+	private Long teacherId;
+	private String teacherName;
+	private int sex;
+	private String tel;
+	private int type;
+	private String openId;
+	private int status;//0-正常 1-冻结
+	@JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone="GMT+8")
+	private Date postTime;
+	private Long schoolId;
+
+	public Long getSchoolId() {
+		return schoolId;
+	}
+	public void setSchoolId(Long schoolId) {
+		this.schoolId = schoolId;
+	}
+	public Long getTeacherId() {
+		return teacherId;
+	}
+	public String getTel() {
+		return tel;
+	}
+	public void setTel(String tel) {
+		this.tel = tel;
+	}
+	public void setTeacherId(Long teacherId) {
+		this.teacherId = teacherId;
+	}
+	public String getTeacherName() {
+		return teacherName;
+	}
+	public void setTeacherName(String teacherName) {
+		this.teacherName = teacherName;
+	}
+	public int getSex() {
+		return sex;
+	}
+	public void setSex(int sex) {
+		this.sex = sex;
+	}
+	public int getType() {
+		return type;
+	}
+	public void setType(int type) {
+		this.type = type;
+	}
+	public String getOpenId() {
+		return openId;
+	}
+	public void setOpenId(String openId) {
+		this.openId = openId;
+	}
+	public int getStatus() {
+		return status;
+	}
+	public void setStatus(int status) {
+		this.status = status;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+	
+}

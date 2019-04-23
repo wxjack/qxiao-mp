@@ -1,0 +1,34 @@
+package com.qxiao.wx.user.jpa.service;
+
+import java.io.File;
+import java.util.List;
+import java.util.Map;
+
+import com.qxiao.wx.user.vo.QueryStudentListVo;
+import com.qxiao.wx.user.vo.QueryStudentSupplyVo;
+import com.qxiao.wx.user.vo.QueryStudentVo;
+import com.qxiao.wx.user.vo.StudentSupplyVo;
+import com.spring.jpa.service.ServiceException;
+
+public interface StudentService {
+	
+	List<QueryStudentListVo> queryClassIdByTeacherId(Long teacherId);
+	
+	Map<String,Object> studentSupply(StudentSupplyVo vo) throws Exception;
+	
+	List<QueryStudentVo> studentQuery(String openId) throws Exception;
+	
+	void studentAdd(StudentSupplyVo vo);
+	
+	List<QueryStudentSupplyVo> queryStudentSupply(String tele);
+	/**
+	 * 批量新增
+	 * @param file
+	 * @return
+	 */
+	Integer studentBatchAdd(File file);
+	
+	void studentUpdate(QueryStudentVo vo) throws ServiceException;
+	
+	void studentDelete(Long studentId) throws ServiceException;
+}

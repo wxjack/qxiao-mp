@@ -1,0 +1,14 @@
+package com.qxiao.wx.user.jpa.service;
+
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.vo.QueryBySchoolCodeVo;
+@Service
+public interface QuerySchoolInfoService {
+	QmPlaySchoolInfo queryByOpenId(String openId);
+	
+	QueryBySchoolCodeVo queryBySchoolCode(String openId);
+	
+	QmPlaySchoolInfo querySchoolInfo(String schoolCode);
+}

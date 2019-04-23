@@ -1,0 +1,30 @@
+package com.qxiao.wx.user.util;
+
+import org.apache.shiro.crypto.hash.SimpleHash;
+import org.apache.shiro.util.ByteSource;
+import org.json.JSONObject;
+
+public class PasswordHelper {
+	
+    public static JSONObject encryptPassword(String algorithmName,int hashIterations,String name, String password, String salt) {
+    	
+       
+        String passwd = new SimpleHash(
+                algorithmName,
+                password,
+                ByteSource.Util.bytes(name+salt),
+                hashIterations).toHex();
+
+        JSONObject obj = new JSONObject();
+        obj.put("salt", salt);
+        obj.put("password", passwd);
+        return obj;
+    }
+    public static JSONObject encryptPassword(String name, String password, String salt) {
+    	return encryptPassword("md5",2,name,password,salt);
+    }
+    public static JSONObject encryptPassword(String name, String password) {
+    	String salt = "";
+    	return encryptPassword("md5",2,name,password,salt);
+    }
+}

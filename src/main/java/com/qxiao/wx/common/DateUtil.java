@@ -1,0 +1,55 @@
+package com.qxiao.wx.common;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+public class DateUtil {
+
+	private static SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+	private static SimpleDateFormat format2 = new SimpleDateFormat("yyyy-MM-dd");
+	private DateUtil() {
+	};
+
+	// 年月日 时分秒
+	public static Date parseDate(String time) throws ParseException {
+		return format.parse(time);
+	}
+
+	public static Date parsrTime(String str) {
+		String fmt = str.replace("年", "-")
+						.replace("月", "-")
+						.replace("日", "");
+		try {
+			return format2.parse(fmt);
+		} catch (ParseException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	public static String toStringTimeFormat(Date date) {
+		return format.format(date);
+	}
+
+	public static String toStringFormat(long time) {
+		Date date = new Date(time);
+		return toStringTimeFormat(date);
+	}
+
+	public static String toHMS(Date date) {
+		String timeFormat = toStringTimeFormat(date);
+		return timeFormat.substring(timeFormat.indexOf(" ") + 1);
+	}
+
+	public static String toYMD(Date date) {
+		String timeFormat = toStringTimeFormat(date);
+		return timeFormat.substring(0, timeFormat.indexOf(" "));
+	}
+
+	public static void main(String[] args) throws ParseException {
+		Date string = parsrTime("2019年1月15日");
+		System.out.println(string);
+	}
+
+}

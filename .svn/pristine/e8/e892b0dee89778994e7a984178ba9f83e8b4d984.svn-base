@@ -1,0 +1,56 @@
+package com.qxiao.wx.user.session;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Session {
+	/**
+	 * 唯一标识
+	 */
+	private String openid;
+	/**
+	 * 创建时间
+	 */
+	private long createTime;
+	/**
+	 * 有效时间
+	 */
+	private long validTime;
+	/**
+	 * 键值对集合
+	 */
+	private List<SessionData> sessionDatas = new ArrayList<SessionData>();
+
+	public String getOpenid() {
+		return openid;
+	}
+
+	public void setOpenid(String openid) {
+		this.openid = openid;
+	}
+
+	public long getCreateTime() {
+		return createTime;
+	}
+
+	public void setCreateTime(long createTime) {
+		this.createTime = createTime;
+	}
+
+	public long getValidTime() {
+		return validTime;
+	}
+
+	public void setValidTime(long validTime) {
+		this.validTime = validTime;
+	}
+
+	public List<SessionData> getSessionDatas() {
+		return this.sessionDatas;
+
+	}
+
+	public void setSessionDatas(List<SessionData> sessionDatas) {
+		this.sessionDatas = sessionDatas;
+	}
+}

@@ -1,0 +1,32 @@
+package com.qxiao.wx.fresh.jpa.service;
+
+import java.lang.reflect.InvocationTargetException;
+
+import com.qxiao.wx.fresh.dto.QmFreshCommentDTO;
+import com.spring.jpa.service.ServiceException;
+
+public interface IQmFreshCommentService {
+
+	/**
+	 * 速报留言
+	 * 
+	 * @param openId
+	 * @param textContent
+	 * @param freshId
+	 * @throws ServiceException
+	 */
+	void addComment(String openId, String textContent, Long freshId, Long studentId) throws ServiceException;
+
+	/**
+	 * 速报评论人员查询
+	 * 
+	 * @param freshId
+	 * @param classId
+	 * @return
+	 * @throws InvocationTargetException
+	 * @throws IllegalAccessException
+	 */
+	QmFreshCommentDTO findFreshComment(Long freshId, Long classId)
+			throws IllegalAccessException, InvocationTargetException;
+
+}

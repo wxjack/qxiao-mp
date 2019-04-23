@@ -1,0 +1,24 @@
+package com.qxiao.wx.fresh.jpa.service;
+
+import java.util.List;
+
+import org.json.JSONArray;
+
+import com.qxiao.wx.fresh.dto.QmFreshDetailDTO;
+import com.qxiao.wx.fresh.dto.QmFreshInfoDTO;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshInfo;
+import com.spring.jpa.service.ServiceException;
+
+public interface IQmFreshInfoService {
+	
+	List<QmFreshInfoDTO> findByClassId(String openId, Long classId) throws ServiceException;
+
+	QmFreshDetailDTO findFreshDetail(String openId,Long freshId,Long classId);
+
+	QmFreshInfo addFresh(String openId, String title, String textContent, JSONArray images, JSONArray readers);
+
+	void sendFresh(Long freshId, String openId);
+
+	void deleteFresh(Long freshId, String openId);
+
+}

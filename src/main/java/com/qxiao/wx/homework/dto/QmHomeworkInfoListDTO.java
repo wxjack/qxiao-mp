@@ -1,0 +1,82 @@
+package com.qxiao.wx.homework.dto;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+public class QmHomeworkInfoListDTO {
+
+	private Long homeId;
+	private Long classId;
+    private String title;
+    private String textContent;
+    private String topImage;// "imageUrl":"/image/1.png"
+    private int classReadCount;
+    private int needConfirm;
+    private int status; // 阅读状态  0-未阅读，1-已阅读
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss",timezone = "GMT+8")
+    private Date postTime;/*发布时间*/
+    private Long studentId;
+    
+	public Long getStudentId() {
+		return studentId;
+	}
+	public void setStudentId(Long studentId) {
+		this.studentId = studentId;
+	}
+	public int getNeedConfirm() {
+		return needConfirm;
+	}
+	public void setNeedConfirm(int needConfirm) {
+		this.needConfirm = needConfirm;
+	}
+	public int getStatus() {
+		return status;
+	}
+	public void setStatus(int status) {
+		this.status = status;
+	}
+	public Long getHomeId() {
+		return homeId;
+	}
+	public String getTitle() {
+		return title;
+	}
+	public Long getClassId() {
+		return classId;
+	}
+	public void setClassId(Long classId) {
+		this.classId = classId;
+	}
+	public String getTextContent() {
+		return textContent;
+	}
+	public String getTopImage() {
+		return topImage;
+	}
+	public int getClassReadCount() {
+		return classReadCount;
+	}
+	public Date getPostTime() {
+		return postTime;
+	}
+	public void setHomeId(Long homeId) {
+		this.homeId = homeId;
+	}
+	public void setTitle(String title) {
+		this.title = title;
+	}
+	public void setTextContent(String textContent) {
+		this.textContent = textContent;
+	}
+	public void setTopImage(String topImage) {
+		this.topImage = topImage;
+	}
+	public void setClassReadCount(int classReadCount) {
+		this.classReadCount = classReadCount;
+	}
+	public void setPostTime(Date postTime) {
+		this.postTime = postTime;
+	}
+    
+}

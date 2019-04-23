@@ -1,0 +1,254 @@
+package com.qxiao.wx.user.jpa.service.impl;
+
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.community.jpa.dao.QmClassTeacherDao;
+import com.qxiao.wx.community.jpa.entity.QmClassTeacher;
+import com.qxiao.wx.user.jpa.dao.QmAccountDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolClassDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolTeacherDao;
+import com.qxiao.wx.user.jpa.dao.QmTeleVerifyCodeDao;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolTeacher;
+import com.qxiao.wx.user.jpa.entity.QmTeleVerifyCode;
+import com.qxiao.wx.user.jpa.service.TeacherService;
+import com.qxiao.wx.user.util.FilerReadExcel;
+import com.qxiao.wx.user.vo.AddTeacherVo;
+import com.qxiao.wx.user.vo.QueryTeacherInfoVo;
+import com.qxiao.wx.user.vo.QueryTeacherVo;
+import com.qxiao.wx.user.vo.TeacherJoinVo;
+import com.qxiao.wx.user.vo.UpdateTeacherVo;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+
+@Service
+public class TeacherServiceImpl extends AbstractJdbcService<QmPlaySchoolTeacher> implements TeacherService {
+
+	@Autowired
+	QmPlaySchoolTeacherDao teacherDao;
+	@Autowired
+	QmClassTeacherDao classTeacherDao;
+	@Autowired
+	QmTeleVerifyCodeDao codeDao;
+	@Autowired
+	QmPlaySchoolClassDao classDao;
+	@Autowired
+	QmAccountDao accountDao;
+	@Autowired
+	QmPlaySchoolInfoDao schoolInfoDao;
+	
+	@SuppressWarnings("unchecked")
+	public List<QueryTeacherVo> queryTeacher(Long schoolId) {
+		String sql = "SELECT DISTINCT(teacher.teacher_id),teacher.teacher_name,teacher.open_id, account.photo "
+				+ "FROM qm_play_school_teacher AS teacher LEFT JOIN qm_class_teacher AS ct ON ct.teacher_id = teacher.teacher_id "
+				+ "LEFT JOIN qm_play_school_class AS sc ON sc.class_id = ct.class_id "
+				+ "LEFT JOIN qm_account AS account ON teacher.open_id = account.open_id WHERE sc.school_id = ? and teacher.status=0";
+		String teacherSql = "SELECT class_name FROM qm_play_school_class AS schoolClass,qm_class_teacher as teacher "
+				+ "where schoolClass.class_id=teacher.class_id and teacher.teacher_id=?";
+		List<QueryTeacherVo> findList = (List<QueryTeacherVo>) this.findList(sql, new Object[] { schoolId },
+				QueryTeacherVo.class);
+		for (QueryTeacherVo teacher : findList) {
+			List<?> list = this.findList(teacherSql, new Object[] { teacher.getTeacherId() }, QmPlaySchoolClass.class);
+			teacher.setClasses(list);
+		}
+		return findList;
+	}
+
+	public void AddTeacher(AddTeacherVo qm) throws IllegalAccessException, InvocationTargetException {
+		QmPlaySchoolTeacher qt = new QmPlaySchoolTeacher();
+		BeanUtils.copyProperties(qt, qm);
+		qt.setStatus(0);
+		qt.setPostTime(Calendar.getInstance().getTime());
+		qt.setOpenId("");
+		teacherDao.save(qt);
+		List<Map<String, String>> classes = qm.getClasses();
+		if (classes.size() > 0) {
+			for (Map<String, String> map : classes) {
+				QmClassTeacher qc = new QmClassTeacher();
+				qc.setClassId(Long.valueOf(map.get("classId")));
+				qc.setTeacherId(qt.getTeacherId());
+				qc.setPostTime(Calendar.getInstance().getTime());
+				classTeacherDao.save(qc);
+			}
+		}
+		
+	}
+
+	public Integer AddTeachers(File file) {
+		List<List<String>> readExcel = FilerReadExcel.readExcel(file);
+		for (List<String> obj : readExcel) {
+			QmPlaySchoolTeacher teacher = new QmPlaySchoolTeacher();
+			teacher.setOpenId("");
+			teacher.setPostTime(Calendar.getInstance().getTime());
+			teacher.setSex(Integer.parseInt(obj.get(1)));
+			teacher.setStatus(0);
+			teacher.setTeacherName(obj.get(0));
+			teacher.setTel(obj.get(2));
+			teacher.setType(Integer.parseInt(obj.get(3)));
+			teacherDao.save(teacher);
+			String string = obj.get(4);
+			String[] split = string.split(",");
+			for (int i = 0; i < split.length; i++) {
+				QmClassTeacher tea = new QmClassTeacher();
+				tea.setClassId(Long.valueOf(split[i]));
+				tea.setTeacherId(teacher.getTeacherId());
+				tea.setPostTime(Calendar.getInstance().getTime());
+				classTeacherDao.save(tea);
+			}
+		}
+		return readExcel.size();
+	}
+
+	public void updateTeacher(UpdateTeacherVo vo) throws IllegalAccessException, InvocationTargetException {
+		QmPlaySchoolTeacher teacher = new QmPlaySchoolTeacher();
+		BeanUtils.copyProperties(teacher, vo);
+		QmPlaySchoolTeacher schoolTeacher = teacherDao.findByTeacherId(vo.getTeacherId());
+		if(schoolTeacher.getOpenId()!=null) {
+			teacher.setOpenId(schoolTeacher.getOpenId());
+		}else {
+			teacher.setOpenId("");
+		}
+		teacher.setPostTime(Calendar.getInstance().getTime());
+		teacher.setStatus(0);
+		teacherDao.save(teacher);
+//		classTeacherDao.deleteClassTeacher(vo.getTeacherId());
+		List<QmClassTeacher> findByTeacherId = classTeacherDao.findByTeacherId(vo.getTeacherId());
+		for (QmClassTeacher qct : findByTeacherId) {
+			classTeacherDao.delete(qct.getId());
+		}
+
+		List<Map<String, Object>> classes = vo.getClasses();
+		if (classes.size() > 0) {
+			for (Map<String, Object> map : classes) {
+				QmClassTeacher classTeacher = new QmClassTeacher();
+				classTeacher.setClassId(Long.valueOf(map.get("classId").toString()));
+				classTeacher.setTeacherId(teacher.getTeacherId());
+				classTeacher.setPostTime(Calendar.getInstance().getTime());
+				classTeacherDao.save(classTeacher);
+			}
+		}
+	}
+
+	public QueryTeacherInfoVo query(String openId, Long teacherId)
+			throws IllegalAccessException, InvocationTargetException {
+		QueryTeacherInfoVo vo = new QueryTeacherInfoVo();
+		List<QmClassTeacher> findByTeacher = classTeacherDao.findByTeacherId(teacherId);
+		QmPlaySchoolTeacher schoolTeacher = teacherDao.findByTeacherId(teacherId);
+		if(schoolTeacher!=null) {
+			BeanUtils.copyProperties(vo,schoolTeacher);
+			if (findByTeacher.size() > 0) {
+				List<Object> li=new ArrayList<>();
+				for(QmClassTeacher te:findByTeacher) {
+					li.add(te.getClassId());
+				}
+				vo.setClasses(li);
+			}
+			return vo;
+		}
+		return null;
+	}
+
+	public void deleteTeacher(String openId, Long teacherId) throws Exception {
+		QmPlaySchoolTeacher st = teacherDao.findByTeacherId(teacherId);
+		QmPlaySchoolTeacher qpst=new QmPlaySchoolTeacher();
+		qpst.setSex(st.getSex());
+		qpst.setTeacherId(st.getTeacherId());
+		qpst.setTel(st.getTel());
+		qpst.setType(st.getType());
+		qpst.setOpenId(st.getOpenId());
+		qpst.setTeacherName(st.getTeacherName());
+		qpst.setStatus(1);
+		qpst.setPostTime(Calendar.getInstance().getTime());
+		teacherDao.save(qpst);
+		List<QmClassTeacher> findByTeacherId = classTeacherDao.findByTeacherId(teacherId);
+		if(findByTeacherId.size()>0) {
+			for(QmClassTeacher qct:findByTeacherId) {
+				classTeacherDao.delete(qct.getId());
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> teacherJoin(TeacherJoinVo vo) throws Exception {
+		String sql = "SELECT qpst.* FROM qm_play_school_teacher as qpst "
+				+ "JOIN qm_class_teacher as qct JOIN qm_play_school_class as qpsc "
+				+ "JOIN qm_play_school_info as qpsi where qpst.teacher_id=qct.teacher_id "
+				+ "and qct.class_id=qpsc.class_id and qpsc.school_id=qpsi.school_id and qpsi.school_id=?";
+		List<QmPlaySchoolTeacher> findList = (List<QmPlaySchoolTeacher>) this.findList(sql,
+				new Object[] { vo.getSchoolId() }, QmPlaySchoolTeacher.class);
+		List<QmTeleVerifyCode> findByTele = codeDao.findByTel(vo.getTel());
+		if (findByTele.size() <= 0) {
+			throw new Exception("验证码错误");// 验证码错误
+		}
+		
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		String format = sdf.format(findByTele.get(0).getPostTime());
+		long time = sdf.parse(format).getTime();// 生成时间
+		long millis = Calendar.getInstance().getTimeInMillis() / 1000;// 系统时间
+		if (millis - time > 300000) {
+			throw new Exception("验证码过期");// 验证码过期
+		}
+		if (!findByTele.get(0).getTel().trim().equals(vo.getTel())
+				|| !findByTele.get(0).getVeriftCode().trim().equals(vo.getVeriftCode())) {
+			throw new Exception("验证码或手机有误");// 验证码错误
+		}
+		if (findList.size() < 0) {
+			throw new Exception("请找园长先添加您的手机号码");// 请找园长先添加您的手机号码
+		}
+		
+		QmPlaySchoolTeacher teacher = new QmPlaySchoolTeacher();
+		for (QmPlaySchoolTeacher qpst : findList) {
+			if (qpst.getTel().equals(vo.getTel())) {
+				BeanUtils.copyProperties(teacher, vo);
+				teacher.setOpenId(vo.getOpenId());
+				teacher.setTeacherId(qpst.getTeacherId());
+				teacher.setPostTime(Calendar.getInstance().getTime());
+				teacherDao.save(teacher);
+				
+				QmAccount qa=new QmAccount();
+				QmAccount account = accountDao.findByOpenId(vo.getOpenId());
+				if(account!=null) {
+					BeanUtils.copyProperties(qa, account);
+					qa.setRoleId(qpst.getTeacherId());
+					qa.setPersonType(qpst.getType());
+					qa.setPostTime(Calendar.getInstance().getTime());
+					accountDao.save(qa);
+				}
+			}
+		}
+		Map<String, Object> map=new HashMap<>();
+		if(teacher.getType()==0) {
+			QmPlaySchoolInfo info = schoolInfoDao.findWithTeacher(teacher.getOpenId());
+			map.put("roleType", 1);
+			map.put("id", info.getSchoolId());
+		}else {
+			map.put("id", teacher.getTeacherId());
+			map.put("roleType", 2);
+		}
+		return map;
+	}
+
+	@Override
+	public JPADao<QmPlaySchoolTeacher> getDao() {
+		return null;
+	}
+
+	@Override
+	public Class<QmPlaySchoolTeacher> getEntityClass() {
+		return null;
+	}
+}

@@ -1,0 +1,198 @@
+package com.qxiao.wx.alnum.jpa.service.impl;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.qxiao.wx.alnum.jpa.dao.QmAlbumChannelDao;
+import com.qxiao.wx.alnum.jpa.dao.QmAlbumPhotoVideoDao;
+import com.qxiao.wx.alnum.jpa.entity.QmAlbumChannel;
+import com.qxiao.wx.alnum.jpa.entity.QmAlbumPhotoVideo;
+import com.qxiao.wx.alnum.jpa.service.QmAlbumChannelService;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolClass;
+import com.qxiao.wx.user.util.UploadFile;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+
+@Service
+public class QmAlbumChannelServiceImpl extends AbstractJdbcService<QmAlbumChannel> implements QmAlbumChannelService {
+
+	@Autowired
+	QmAlbumChannelDao channelDao;
+	@Autowired
+	QmAlbumPhotoVideoDao videoDao;
+	@Autowired
+	UploadFile upload;
+
+	public Long albumImageAdd(Long teacherId, Long channelId, Integer type, String imageUrl, String videoUrl)
+			throws Exception {
+		QmAlbumPhotoVideo qapv = new QmAlbumPhotoVideo();
+		if (type == 0) {// 0-图片 1-视频
+			File file = new File(imageUrl);
+			FileInputStream inputStream = new FileInputStream(file);
+			MultipartFile multipartFile = new MockMultipartFile(file.getName(), inputStream);
+			String fileInfo = upload.getFileInfo(multipartFile);
+			qapv.setImageUrl(fileInfo);
+		}
+		if (type == 1) {
+			File file = new File(videoUrl);
+			String fileInfo = upload.getFileInfo((MultipartFile) file);
+			qapv.setVideoUrl(fileInfo);
+		}
+		qapv.setPostTime(Calendar.getInstance().getTime());
+		qapv.setType(type);
+		qapv.setChannelId(channelId);
+		qapv.setTeacherId(teacherId);
+		QmAlbumPhotoVideo photoVideo = videoDao.save(qapv);
+		return photoVideo.getId();
+	}
+
+	public Long addChannel(Long classId, String name) {
+		QmAlbumChannel qac = new QmAlbumChannel();
+		qac.setClassId(classId);
+		qac.setReadCount(0);
+		qac.setTitle(name);
+		qac.setPostTime(Calendar.getInstance().getTime());
+		QmAlbumChannel channel = channelDao.save(qac);
+		return channel.getChannelId();
+	}
+
+	public void count(Long channelId) throws Exception {
+		QmAlbumChannel channel = channelDao.findByChannelId(channelId);
+		String sql = "update qm_album_channel set read_count=? where channel_id=? ";
+		this.update(sql, new Object[] { channel.getReadCount() + 1, channelId });
+	}
+
+	public Map<String, Object> albumChannelDetail(Long channelId) throws Exception {
+		QmAlbumChannel channel = channelDao.findByChannelId(channelId);
+		List<QmAlbumPhotoVideo> findByChannel = videoDao.findByChannelId(channelId);
+		List<Object> li = new ArrayList<>();
+		if (findByChannel.size() > 0) {
+			for (QmAlbumPhotoVideo qapv : findByChannel) {
+				Map<String, Object> map = new HashMap<>();
+				map.put("itemId", qapv.getId());
+				map.put("type", qapv.getType());
+				map.put("SmallImageUrl", qapv.getSmallUrl());
+				map.put("imageUrl", qapv.getImageUrl());
+				map.put("videoUrl", qapv.getVideoUrl());
+				li.add(map);
+			}
+		}
+		Map<String, Object> map = new HashMap<>();
+		map.put("title", channel.getTitle());
+		map.put("channelId", channel.getChannelId());
+		map.put("postTime", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(channel.getPostTime()));
+		map.put("items", li);
+		this.count(channelId);
+		return map;
+	}
+
+	public List<Object> albumChannelQuery(Long classId) {
+		String sql = "SELECT qac.channel_id,qac.title,qac.read_count,qac.post_time "
+				+ "FROM qm_album_channel AS qac JOIN qm_album_photo_video AS qapv "
+				+ "WHERE qac.channel_id = qapv.channel_id AND qac.class_id = ?";
+		List<QmAlbumChannel> findList = (List<QmAlbumChannel>) this.findList(sql, new Object[] { classId },
+				QmAlbumChannel.class);
+		List<Object> li = new ArrayList<>();
+		if (findList.size() > 0) {
+			for (QmAlbumChannel qac : findList) {
+				Map<String, Object> map = new HashMap<>();
+				Integer count = channelDao.queryChannelImageCount(qac.getChannelId());
+				map.put("channelId", qac.getChannelId());
+				map.put("title", qac.getTitle());
+				map.put("readCount", qac.getReadCount());
+				map.put("updateTime", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(qac.getPostTime()));
+				map.put("imagesCount", count);
+				li.add(map);
+			}
+		}
+		return li;
+	}
+
+	public Integer queryImageCount(Long classId) {
+		Integer queryImageCount = channelDao.queryImageCount(classId);
+		return queryImageCount;
+	}
+
+	public List<Object> albumClassQueryOfLeader(String openId) {// 园长
+		String sql = "SELECT qpsc.class_id,qpsc.class_name FROM qm_play_school_info as qpsi "
+				+ "join qm_play_school_class as qpsc where qpsi.school_id=qpsc.school_id " + "and qpsi.open_id=?";
+		List<QmPlaySchoolClass> findList = (List<QmPlaySchoolClass>) this.findList(sql, new Object[] { openId },
+				QmPlaySchoolClass.class);
+		List<Object> li = new ArrayList<>();
+		if (findList.size() > 0) {
+			for (QmPlaySchoolClass qpsc : findList) {
+				int count = this.queryImageCount(qpsc.getClassId());
+				Map<String, Object> map = new HashMap<>();
+				map.put("classId", qpsc.getClassId());
+				map.put("className", qpsc.getClassName());
+				map.put("imagesCount", count);
+				li.add(map);
+			}
+		}
+		return li;
+	}
+
+	public List<Object> albumClassQueryOfTeacher(String openId) {// 老师
+		String sql = "SELECT qpsc.class_id,qpsc.class_name FROM qm_play_school_teacher as qpst "
+				+ "join qm_class_teacher as qct join qm_play_school_class as qpsc where "
+				+ "qpst.teacher_id=qct.teacher_id and qpsc.class_id=qct.class_id and qpst.open_id=?";
+		List<QmPlaySchoolClass> findList = (List<QmPlaySchoolClass>) this.findList(sql, new Object[] { openId },
+				QmPlaySchoolClass.class);
+		List<Object> li = new ArrayList<>();
+		if (findList.size() > 0) {
+			for (QmPlaySchoolClass qpsc : findList) {
+				int count = this.queryImageCount(qpsc.getClassId());
+				Map<String, Object> map = new HashMap<>();
+				map.put("classId", qpsc.getClassId());
+				map.put("className", qpsc.getClassName());
+				map.put("imagesCount", count);
+				li.add(map);
+			}
+		}
+		return li;
+	}
+
+	public List<Object> albumClassQueryOfStudent(String openId) {// 家长
+		String sql = "SELECT qpsc.class_name,qpsc.class_id FROM qm_patriarch AS qp JOIN qm_patriarch_student AS qps "
+				+ "JOIN qm_student AS qs JOIN qm_play_school_class AS qpsc JOIN qm_class_student AS qcs "
+				+ "WHERE qp.id = qps.patriarch_id AND qps.student_id = qs.student_id AND qs.student_id = qcs.student_id "
+				+ "AND qcs.class_id = qpsc.class_id AND qp.open_id = ?";
+		List<QmPlaySchoolClass> findList = (List<QmPlaySchoolClass>) this.findList(sql, new Object[] { openId },
+				QmPlaySchoolClass.class);
+		List<Object> li = new ArrayList<>();
+		if (findList.size() > 0) {
+			for (QmPlaySchoolClass qpsc : findList) {
+				int count = this.queryImageCount(qpsc.getClassId());
+				Map<String, Object> map = new HashMap<>();
+				map.put("classId", qpsc.getClassId());
+				map.put("className", qpsc.getClassName());
+				map.put("imagesCount", count);
+				li.add(map);
+			}
+		}
+		return li;
+	}
+
+	@Override
+	public JPADao<QmAlbumChannel> getDao() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Class<QmAlbumChannel> getEntityClass() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+}

@@ -1,0 +1,602 @@
+package com.qxiao.wx.notice.jpa.service.impl;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONArray;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.common.DateUtil;
+import com.qxiao.wx.common.JsonMapper;
+import com.qxiao.wx.componse.GetIdentityService;
+import com.qxiao.wx.componse.UserInfo;
+import com.qxiao.wx.fresh.vo.QmImage;
+import com.qxiao.wx.notice.dto.QmNoticeDetailDTO;
+import com.qxiao.wx.notice.dto.QmNoticeInfoDTO;
+import com.qxiao.wx.notice.dto.QmNoticeInfoReadDTO;
+import com.qxiao.wx.notice.dto.QmNoticeReadDTO;
+import com.qxiao.wx.notice.jpa.dao.QmNoticeImageDao;
+import com.qxiao.wx.notice.jpa.dao.QmNoticeInfoDao;
+import com.qxiao.wx.notice.jpa.dao.QmNoticeReadConfirmDao;
+import com.qxiao.wx.notice.jpa.dao.QmNoticeSenderDao;
+import com.qxiao.wx.notice.jpa.entity.QmNoticeImage;
+import com.qxiao.wx.notice.jpa.entity.QmNoticeInfo;
+import com.qxiao.wx.notice.jpa.entity.QmNoticeReadConfirm;
+import com.qxiao.wx.notice.jpa.entity.QmNoticeSender;
+import com.qxiao.wx.notice.jpa.service.IQmNoticeInfoService;
+import com.qxiao.wx.notice.sqlconst.SQLConst;
+import com.qxiao.wx.notice.vo.SenderVO;
+import com.qxiao.wx.user.jpa.dao.QmMessageSendDao;
+import com.qxiao.wx.user.jpa.dao.QmPatriarchDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolInfoDao;
+import com.qxiao.wx.user.jpa.dao.QmPlaySchoolTeacherDao;
+import com.qxiao.wx.user.jpa.dao.QmStudentDao;
+import com.qxiao.wx.user.jpa.entity.QmMessageSend;
+import com.qxiao.wx.user.jpa.entity.QmPatriarch;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolInfo;
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolTeacher;
+import com.qxiao.wx.user.jpa.entity.QmStudent;
+import com.spring.entity.DataPage;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@SuppressWarnings("unchecked")
+@Service
+public class QmNoticeInfoServiceImpl extends AbstractJdbcService<QmNoticeInfo> implements IQmNoticeInfoService {
+
+	@Autowired
+	private QmNoticeInfoDao noticeInfoDao;
+	@Autowired
+	private QmNoticeImageDao imageDao;
+	@Autowired
+	private QmNoticeSenderDao senderDao;
+	@Autowired
+	private QmNoticeReadConfirmDao confirmDao;
+	@Autowired
+	private QmStudentDao studentDao;
+	@Autowired
+	private QmPlaySchoolTeacherDao teacherDao;
+	@Autowired
+	private QmPlaySchoolInfoDao schoolDao;
+	@Autowired
+	private QmPatriarchDao patriarchDao;
+	@Autowired
+	private QmMessageSendDao messageDao;
+	@Autowired
+	private GetIdentityService idService;
+
+	@Override
+	public JPADao<QmNoticeInfo> getDao() {
+		return this.noticeInfoDao;
+	}
+
+	@Override
+	public Class<QmNoticeInfo> getEntityClass() {
+		return QmNoticeInfo.class;
+	}
+
+	@Override
+	// 新建通知
+	public QmNoticeInfo addNoticeInfo(String openId, String title, String textContent, JSONArray images,
+			int needConfirm, JSONArray senders, int clockType, String clockTime) throws Exception {
+
+		QmNoticeInfo noticeInfo = new QmNoticeInfo();
+		noticeInfo.setTextContent(textContent);
+		noticeInfo.setTitle(title);
+		noticeInfo.setClockType(clockType);
+		if (clockType == 1) {
+			noticeInfo.setClockTime(DateUtil.parsrTime(clockTime));
+		}
+		noticeInfo.setOpenId(openId);
+		noticeInfo.setMessageSend(1);
+		noticeInfo.setIsDel(0);
+		if (StringUtils.isNotEmpty(clockTime)) {
+			noticeInfo.setClockTime(DateUtil.parsrTime(clockTime));
+		}
+		noticeInfo.setSendTime(new Date());
+		noticeInfo.setPostTime(new Date());
+		QmNoticeInfo info = noticeInfoDao.save(noticeInfo);
+		// 添加图片
+		QmNoticeImage image = null;
+		if (images != null && images.length() > 0) {
+			image = this.addImage(images, info);
+		}
+		// 添加发送对象
+		this.addNoticeSender(senders, info);
+
+		this.sendMessage(info, image, senders);
+
+		return info;
+	}
+
+	private void sendMessage(QmNoticeInfo info, QmNoticeImage image, JSONArray senders) {
+		Iterator<Object> it = senders.iterator();
+		List<QmMessageSend> msges = new ArrayList<>();
+		while (it.hasNext()) {
+			String str = it.next() + "";
+			SenderVO senderVO = JsonMapper.obj2Instance(str, SenderVO.class);
+			if (senderVO.getSendType() == 1) {// 1班级 2 老师
+				List<QmPatriarch> patriarchs = patriarchDao.findByClassId(senderVO.getSenderId());
+				for (QmPatriarch par : patriarchs) {
+					if (StringUtils.isNotEmpty(par.getOpenId())) {
+						this.templateMessage(msges, info, par.getOpenId());
+					}
+				}
+				List<QmPlaySchoolTeacher> teacher = teacherDao.findByClassId(senderVO.getSenderId());
+				// 本班的老师openId添加进推送表中
+				for (QmPlaySchoolTeacher teach : teacher) {
+					this.templateMessage(msges, info, teach.getOpenId());
+				}
+			} else {
+				QmPlaySchoolTeacher teacher = teacherDao.findByTeacherId(senderVO.getSenderId());
+				this.templateMessage(msges, info, teacher.getOpenId());
+			}
+		}
+		messageDao.save(msges);
+	}
+
+	private void templateMessage(List<QmMessageSend> msges, QmNoticeInfo info, String openId) {
+		QmMessageSend message = new QmMessageSend();
+		message.setMessageId(info.getNoticeId());
+		message.setType(1);
+		message.setOpenId(openId);
+		message.setResult(0);
+		message.setTitle(info.getTitle());
+		message.setTextContent(info.getTextContent());
+		message.setPostTime(new Date());
+		msges.add(message);
+	}
+
+	private void addNoticeSender(JSONArray senders, QmNoticeInfo info) {
+		List<QmNoticeSender> sends = new ArrayList<>();
+		Iterator<Object> it = senders.iterator();
+		while (it.hasNext()) {
+			String str = it.next() + "";
+			SenderVO senderVO = JsonMapper.obj2Instance(str, SenderVO.class);
+			QmNoticeSender sender = new QmNoticeSender();
+			sender.setNoticeId(info.getNoticeId());
+			sender.setSenderId(senderVO.getSenderId());
+			sender.setSenderType(senderVO.getSendType());
+			sender.setPostTime(new Date());
+			if (sender.getSenderType() == 2) {
+				info.setNeedConfirm(1);
+				noticeInfoDao.save(info);
+			}
+			sends.add(sender);
+		}
+		senderDao.save(sends);
+	}
+
+	private QmNoticeImage addImage(JSONArray images, QmNoticeInfo info) {
+		List<QmNoticeImage> imageList = new ArrayList<>();
+		Iterator<Object> it = images.iterator();
+		while (it.hasNext()) {
+			String imageUrl = it.next() + "";
+			QmImage img = JsonMapper.obj2Instance(imageUrl, QmImage.class);
+			QmNoticeImage image = new QmNoticeImage();
+			image.setNoticeId(info.getNoticeId());
+			image.setImageUrl(img.getImageUrl());
+			image.setSmallUrl("small_" + img.getImageUrl());
+			image.setPostTime(new Date());
+			imageList.add(image);
+		}
+		Iterable<QmNoticeImage> save = imageDao.save(imageList);
+		Iterator<QmNoticeImage> iterator = save.iterator();
+		return iterator.next();
+	}
+
+	@Override
+	// 定时推送通知
+	public void sendNotice(String openId, Long noticeId) {
+		QmNoticeInfo noticeInfo = noticeInfoDao.findOne(noticeId);
+		noticeInfo.setMessageSend(1);
+		noticeInfo.setSendTime(new Date());
+		noticeInfoDao.save(noticeInfo);
+	}
+
+	@Override
+	// 查询所有通知
+	public DataPage<QmNoticeInfoDTO> noticeQuery(String openId, Long classId, int type, int page, int pageSize)
+			throws ServiceException {
+		List<QmNoticeInfoDTO> infoDTOs = null;
+		DataPage<QmNoticeInfoDTO> dataPage = null;
+		// 查询班级通告
+		if (type == 0) {
+			if (classId == 0) {
+				// 园长 或 管理员 O
+				dataPage = this.queryAll(openId, page, pageSize);
+			}
+			if (classId > 0) {
+				// 老师 或 家长 O
+				dataPage = this.queryByclassId(classId, openId, page, pageSize);
+			}
+			infoDTOs = (List<QmNoticeInfoDTO>) dataPage.getData();
+		}
+		// 查询自己的
+		if (type == 1) {
+			dataPage = this.queryMyNotice(openId, page, pageSize);
+			infoDTOs = (List<QmNoticeInfoDTO>) dataPage.getData();
+			QmPlaySchoolInfo school = schoolDao.findByOpenId(openId);
+			if (school != null) {
+				for (QmNoticeInfoDTO info : infoDTOs) {
+					info.setName(school.getLeaderName());
+				}
+			} else {
+				QmPlaySchoolTeacher teacher = teacherDao.findByOpenId(openId);
+				for (QmNoticeInfoDTO info : infoDTOs) {
+					info.setName(teacher.getTeacherName());
+				}
+			}
+		}
+		if (CollectionUtils.isNotEmpty(infoDTOs)) {
+			// 获取图片
+			this.getImageUrl(infoDTOs);
+
+			for (QmNoticeInfoDTO dto : infoDTOs) {
+				// 获取推送人姓名
+				this.getSender(dto);
+			}
+			dataPage.setData(infoDTOs);
+		} else {
+			dataPage.setData(new ArrayList<>());
+		}
+		return dataPage;
+	}
+
+	// 按班级查询通知 O
+	private DataPage<QmNoticeInfoDTO> queryByclassId(Long classId, String openId, int page, int pageSize)
+			throws ServiceException {
+		QmPlaySchoolTeacher teacher = teacherDao.findByOpenId(openId);
+		DataPage<QmNoticeInfoDTO> dataPage = null;
+		if (teacher == null) {
+			// 查询发送到班级的通知、家长端
+			dataPage = (DataPage<QmNoticeInfoDTO>) this.findSendClass(classId, page, pageSize);
+		} else {
+			// 查询发送到班级的通知 + 老师的通知、 老师端
+			dataPage = (DataPage<QmNoticeInfoDTO>) this.findSendClassAndTeach(openId, classId, page, pageSize);
+		}
+		return dataPage;
+	}
+
+	// 获取发送人姓名
+	private void getSender(QmNoticeInfoDTO dto) {
+		Long noticeId = dto.getNoticeId();
+		QmNoticeInfo noticeInfo = noticeInfoDao.findOne(noticeId);
+		String openId = noticeInfo.getOpenId();
+		QmPlaySchoolTeacher teacher = teacherDao.findByOpenId(openId);
+		if (teacher != null) {
+			dto.setName(teacher.getTeacherName());
+			dto.setPersonType(2);
+		} else {
+			QmPlaySchoolInfo school = schoolDao.findByOpenId(openId);
+			dto.setName(school.getLeaderName());
+			dto.setPersonType(1);
+		}
+	}
+
+	// 查询发送到班级的通知 + 老师的通知、老师端 O
+	private DataPage<QmNoticeInfoDTO> findSendClassAndTeach(String openId, Long classId, int page, int pageSize)
+			throws ServiceException {
+		return (DataPage<QmNoticeInfoDTO>) super.getPage(SQLConst.teacherQuery(), page, pageSize,
+				new Object[] { classId, openId }, QmNoticeInfoDTO.class);
+	}
+
+	// 查询发送到班级的通知、家长端 O
+	private DataPage<QmNoticeInfoDTO> findSendClass(Long classId, int page, int pageSize) throws ServiceException {
+		return (DataPage<QmNoticeInfoDTO>) super.getPage(SQLConst.findSendClass(), page, pageSize,
+				new Object[] { classId }, QmNoticeInfoDTO.class);
+	}
+
+	// 园长,管理员查询 O
+	private DataPage<QmNoticeInfoDTO> queryAll(String openId, int page, int pageSize) throws ServiceException {
+		UserInfo userInfo = idService.getIdentity(openId);
+		return (DataPage<QmNoticeInfoDTO>) super.getPage(SQLConst.queryAll(), page, pageSize,
+				new Object[] { userInfo.getSchoolId(),userInfo.getSchoolId() }, QmNoticeInfoDTO.class);
+	}
+
+	// O
+	private DataPage<QmNoticeInfoDTO> queryMyNotice(String openId, int page, int pageSize) throws ServiceException {
+		return (DataPage<QmNoticeInfoDTO>) this.getPage(SQLConst.queryLeaderNotice(), page, pageSize,
+				new Object[] { openId, openId }, QmNoticeInfoDTO.class);
+	}
+
+	// 获取图片信息
+	private void getImageUrl(List<QmNoticeInfoDTO> infoDTOs) {
+		for (QmNoticeInfoDTO infoDTO : infoDTOs) {
+			QmNoticeImage image = imageDao.findByNoticeIdLimit(infoDTO.getNoticeId());
+			if (image != null) {
+				infoDTO.setTopImage(image.getImageUrl());
+			}
+		}
+	}
+
+	@Override
+	// 通知详情
+	public QmNoticeDetailDTO noticeDetail(String openId, Long noticeId, Long classId) {
+		QmNoticeDetailDTO infoDTO = null;
+		// 添加阅读记录
+		QmStudent stu = studentDao.findByOpenId(openId);
+		if (stu != null) {
+			// 家长端查询通知详情 0
+			QmNoticeReadConfirm confirm = confirmDao.findByNoticeIdAndStudentId(noticeId, stu.getStudentId());
+			if (confirm == null) {
+				confirm = new QmNoticeReadConfirm();
+				confirm.setConfirmFlag(0);
+				confirm.setNoticeId(noticeId);
+				confirm.setPostTime(new Date());
+				confirm.setStudentId(stu.getStudentId());
+				confirm = confirmDao.save(confirm);
+			}
+			infoDTO = this.findWithPatriarch(classId, noticeId);
+			infoDTO.setConfirmFlag(confirm.getConfirmFlag());
+		} else {
+			QmPlaySchoolTeacher teacher = teacherDao.findByOpenId(openId);
+			if (teacher != null) {
+				if (teacher.getType() == 1) {
+					// 管理端通知详情 O
+					infoDTO = teacher.getType() == 1 ? this.findWithLeader(noticeId, openId)
+							: this.findWithTeach(noticeId, classId);
+				} else {
+					// 带班老师 O
+					infoDTO = this.findWithTeach(noticeId, classId);
+				}
+			} else {
+				// 园长端通知详情
+				infoDTO = this.findWithLeader(noticeId, openId);
+			}
+			infoDTO.setConfirmFlag(0);
+		}
+		// 获取图片
+		if (infoDTO != null) {
+			this.setDetailWithImageUrl(infoDTO);
+		}
+		return infoDTO;
+	}
+
+	private QmNoticeDetailDTO findWithLeader(Long noticeId, String openId) {
+		List<QmNoticeSender> senders = senderDao.findByNoticeId(noticeId);
+		UserInfo userinfo = idService.getIdentity(openId);
+		if (senders.get(0).getSenderType() == 1) {
+			// 只发给老师 0
+			return this.findWithSchool(noticeId);
+		}
+		// 查询的结果应是所有班级的集合 0
+		return this.findWithClass(userinfo.getSchoolId(), noticeId);
+	}
+
+	private QmNoticeDetailDTO findWithSchool(Long noticeId) {
+		List<QmNoticeDetailDTO> infoDTO = ((List<QmNoticeDetailDTO>) super.findList(SQLConst.findWithSchool(),
+				new Object[] { noticeId }, QmNoticeDetailDTO.class));
+		if (CollectionUtils.isNotEmpty(infoDTO)) {
+			return infoDTO.get(0);
+		}
+		return null;
+	}
+
+	private QmNoticeDetailDTO findWithClass(Long schoolId, Long noticeId) {
+		List<QmNoticeDetailDTO> infoDTO = ((List<QmNoticeDetailDTO>) super.findList(SQLConst.findWithClass(),
+				new Object[] { noticeId, schoolId }, QmNoticeDetailDTO.class));
+		if (CollectionUtils.isNotEmpty(infoDTO)) {
+			return infoDTO.get(0);
+		}
+		return null;
+	}
+
+	// 通知详情图片信息
+	private void setDetailWithImageUrl(QmNoticeDetailDTO infoDTO) {
+		List<QmNoticeImage> images = imageDao.findByNoticeId(infoDTO.getNoticeId());
+		List<Map<String, String>> mpas = new ArrayList<>();
+		for (QmNoticeImage image : images) {
+			Map<String, String> map = new HashMap<>();
+			map.put("imageUrl", image.getImageUrl());
+			mpas.add(map);
+		}
+		infoDTO.setImages(mpas);
+	}
+
+	// 老师端通知详情
+	private QmNoticeDetailDTO findWithTeach(Long noticeId, Long classId) {
+		QmNoticeSender sender = senderDao.findByNoticeId(noticeId, classId);
+		QmNoticeDetailDTO infoDTO = null;
+		if (sender != null) {
+			// 发给班级的
+			infoDTO = this.findWithPatriarch(classId, noticeId);
+		} else {
+			// 只发送给老师的通知
+			infoDTO = this.findWithTeacher(noticeId, classId);
+		}
+		return infoDTO;
+	}
+
+	// 查询发送到老师端通知
+	private QmNoticeDetailDTO findWithTeacher(Long noticeId, Long classId) {
+		List<QmNoticeDetailDTO> infoDTO = ((List<QmNoticeDetailDTO>) super.findList(SQLConst.findWithTeacher(),
+				new Object[] { noticeId, classId }, QmNoticeDetailDTO.class));
+		if (CollectionUtils.isNotEmpty(infoDTO)) {
+			return infoDTO.get(0);
+		}
+		return null;
+	}
+
+	// 家长端查询通知详情 O
+	private QmNoticeDetailDTO findWithPatriarch(Long classId, Long noticeId) {
+		List<QmNoticeDetailDTO> findList = (List<QmNoticeDetailDTO>) super.findList(SQLConst.findWithPatriarch(),
+				new Object[] { noticeId, classId }, QmNoticeDetailDTO.class);
+		QmNoticeDetailDTO infoDTO = null;
+		if (CollectionUtils.isNotEmpty(findList)) {
+			infoDTO = findList.get(0);
+		}
+		return infoDTO;
+	}
+
+	@Override
+	// 删除通知
+	@Transactional
+	public void deleteNotice(String openId, Long noticeId, Long classId) {
+		QmNoticeInfo noticeInfo = noticeInfoDao.findOne(noticeId);
+		noticeInfo.setIsDel(1);
+		noticeInfoDao.save(noticeInfo);
+	}
+
+	@Override
+	// 通知确认
+	@Transactional
+	public void noticeConfirm(String openId, Long noticeId, Long studentId) {
+		QmNoticeReadConfirm confirm = confirmDao.findByNoticeIdAndStudentId(noticeId, studentId);
+		if (confirm.getConfirmFlag() == 0) {
+			confirm.setConfirmFlag(1);
+			confirmDao.save(confirm);
+		}
+	}
+
+	@Override
+	// 公告阅读人员查询
+	public QmNoticeInfoReadDTO noticeReaders(String openId, Long noticeId, Long classId, int readFlag) {
+		List<QmNoticeSender> senders = senderDao.findByNoticeId(noticeId);
+		QmNoticeSender sender = senders.get(0);
+		if (sender.getSenderType() == 2) {
+			return null;
+		}
+		QmNoticeInfoReadDTO readDTO = this.findNoticeInfoReaders(noticeId, classId);
+		if (readDTO != null) {
+			this.findReadersInfo(readDTO, openId, noticeId, classId, readFlag);
+		}
+		return readDTO;
+	}
+
+	private void findReadersInfo(QmNoticeInfoReadDTO readDTO, String openId, Long noticeId, Long classId,
+			int readFlag) {
+		UserInfo user = idService.getIdentity(openId);
+		if (user.getType() == 0 || user.getType() == 1) {
+			// 管理员 | 园长
+			this.findForReaders(readDTO, openId, noticeId, classId, readFlag);
+		}
+		if (user.getType() == 2) {
+			// 普通老师
+			this.findForReaders(readDTO, openId, noticeId, classId, readFlag);
+		}
+	}
+
+	private void findForReaders(QmNoticeInfoReadDTO readDTO, String openId, Long noticeId, Long classId, int readFlag) {
+		UserInfo user = idService.getIdentity(openId);
+		List<QmNoticeReadDTO> readers = this.readInfo(classId, noticeId, user);
+		List<QmNoticeReadDTO> unReaders = this.unReadInfo(classId, noticeId, user);
+		if (CollectionUtils.isNotEmpty(readers)) {
+			readDTO.setReadCount(readers.size());
+		} else {
+			readDTO.setReadCount(0);
+		}
+		if (CollectionUtils.isNotEmpty(unReaders)) {
+			readDTO.setReadCount(unReaders.size());
+		} else {
+			readDTO.setReadCount(0);
+		}
+		if (readFlag == 0) {
+			readDTO.setReaders(readers);
+		} else {
+			readDTO.setReaders(unReaders);
+		}
+	}
+
+	private List<QmNoticeReadDTO> unReadInfo(Long classId, Long noticeId, UserInfo user) {
+		if (user != null) {
+			if (user.getType() == 0 || user.getType() == 1) {
+				String sql = "SELECT qs.student_id AS studentId, qs.student_name AS studentName, "
+						+ "qs.photo AS photo, qp.relation AS relation FROM qm_student AS qs "
+						+ "JOIN qm_class_student AS qc ON qc.student_id = qs.student_id "
+						+ "JOIN qm_patriarch_student AS q ON q.student_id = qs.student_id "
+						+ "JOIN qm_patriarch AS qp ON qp.id = q.patriarch_id "
+						+ "JOIN qm_play_school_class AS cla ON cla.class_id = qc.class_id WHERE "
+						+ "cla.school_id = ? AND qs.student_id NOT IN ( SELECT q.student_id FROM "
+						+ "qm_notice_read_confirm AS q JOIN qm_notice_sender AS qh ON qh.notice_id = q.notice_id "
+						+ "JOIN qm_play_school_class AS sch ON sch.class_id = qh.sender_id WHERE "
+						+ "q.notice_id = ? AND qh.sender_type = 1 AND sch.school_id = cla.school_id "
+						+ "GROUP BY q.student_id )";
+
+				return (List<QmNoticeReadDTO>) this.findList(sql, new Object[] { user.getSchoolId(), noticeId },
+						QmNoticeReadDTO.class);
+			} else {
+				String sql = "SELECT qs.student_id AS studentId, qs.student_name AS studentName, "
+						+ "qs.photo AS photo, qp.relation AS relation FROM qm_student AS qs "
+						+ "JOIN qm_class_student AS qc ON qc.student_id = qs.student_id "
+						+ "JOIN qm_patriarch_student AS q ON q.student_id = qs.student_id "
+						+ "JOIN qm_patriarch AS qp ON qp.id = q.patriarch_id WHERE qc.class_id = ? "
+						+ "AND qs.student_id NOT IN ( SELECT q.student_id FROM "
+						+ "qm_notice_read_confirm AS q JOIN qm_notice_sender AS qh ON qh.notice_id = q.notice_id "
+						+ "WHERE q.notice_id = ? AND qh.sender_type = 1 AND qh.sender_id = qc.class_id )";
+				return (List<QmNoticeReadDTO>) this.findList(sql, new Object[] { classId, noticeId },
+						QmNoticeReadDTO.class);
+			}
+		} else {
+			return new ArrayList<>();
+		}
+	}
+
+	private List<QmNoticeReadDTO> readInfo(Long classId, Long noticeId, UserInfo user) {
+		if (user != null) {
+			if (user.getType() == 0 || user.getType() == 1) {
+				String sql = "SELECT qs.student_id AS studentId, qs.student_name AS studentName, "
+						+ "qs.photo AS photo, qp.relation AS relation, qhr.confirm_flag AS confirmFlag, "
+						+ "qhr.post_time AS postTime FROM qm_student AS qs "
+						+ "JOIN qm_notice_read_confirm AS qhr ON qs.student_id = qhr.student_id "
+						+ "JOIN qm_class_student AS qcs ON qs.student_id = qcs.student_id "
+						+ "JOIN qm_patriarch_student AS qps ON qs.student_id = qps.student_id "
+						+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id "
+						+ "JOIN qm_play_school_class AS sch ON sch.class_id = qcs.class_id WHERE "
+						+ "sch.school_id = ? AND qhr.notice_id = ?";
+				return (List<QmNoticeReadDTO>) this.findList(sql, new Object[] { user.getSchoolId(), noticeId },
+						QmNoticeReadDTO.class);
+			} else {
+				String sql = "SELECT qs.student_id AS studentId, qs.student_name AS studentName, "
+						+ "qs.photo AS photo, qp.relation AS relation, qhr.confirm_flag AS confirmFlag, "
+						+ "qhr.post_time AS postTime FROM qm_student AS qs "
+						+ "JOIN qm_notice_read_confirm AS qhr ON qs.student_id = qhr.student_id "
+						+ "JOIN qm_class_student AS qcs ON qs.student_id = qcs.student_id "
+						+ "JOIN qm_patriarch_student AS qps ON qs.student_id = qps.student_id "
+						+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id WHERE qcs.class_id = ? "
+						+ "AND qhr.notice_id = ?";
+				return (List<QmNoticeReadDTO>) this.findList(sql, new Object[] { classId, noticeId },
+						QmNoticeReadDTO.class);
+			}
+		} else {
+			return new ArrayList<>();
+		}
+	}
+
+	private QmNoticeInfoReadDTO findNoticeInfoReaders(Long noticeId, Long classId) {
+		QmNoticeInfo info = noticeInfoDao.findByNoticeIdAndClassIdAndSendType(noticeId, classId, 1);
+		QmNoticeInfoReadDTO readDTO = null;
+		if (info != null) {
+			readDTO = new QmNoticeInfoReadDTO();
+			readDTO.setNoticeId(noticeId);
+			readDTO.setTitle(info.getTitle());
+			readDTO.setPostTime(info.getPostTime());
+		}
+		return readDTO;
+	}
+
+	@Override
+	public List<QmNoticeInfo> findByClockTime(Date date) {
+		return noticeInfoDao.findByClockTime(date);
+	}
+
+	@Override
+	public boolean update(List<QmNoticeInfo> notices) {
+		Iterable<QmNoticeInfo> iterable = noticeInfoDao.save(notices);
+		Iterator<QmNoticeInfo> it = iterable.iterator();
+		while (it.hasNext()) {
+			return true;
+		}
+		return false;
+	}
+}

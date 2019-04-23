@@ -1,0 +1,216 @@
+package com.qxiao.wx.community.jpa.service.impl;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONArray;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.common.JsonMapper;
+import com.qxiao.wx.community.dto.QmCommunityCommentDTO;
+import com.qxiao.wx.community.dto.QmCommunityInfoDTO;
+import com.qxiao.wx.community.dto.QmCommunityPraiseDTO;
+import com.qxiao.wx.community.jpa.dao.QmClassCommunityDao;
+import com.qxiao.wx.community.jpa.dao.QmCommunityImageDao;
+import com.qxiao.wx.community.jpa.dao.QmCommunityInfoDao;
+import com.qxiao.wx.community.jpa.dao.QmCommunityVideoDao;
+import com.qxiao.wx.community.jpa.entity.QmClassCommunity;
+import com.qxiao.wx.community.jpa.entity.QmCommunityImage;
+import com.qxiao.wx.community.jpa.entity.QmCommunityInfo;
+import com.qxiao.wx.community.jpa.entity.QmCommunityVideo;
+import com.qxiao.wx.community.jpa.service.IQmCommunityInfoService;
+import com.qxiao.wx.community.sqlconst.CommunitySQL;
+import com.qxiao.wx.componse.GetIdentityService;
+import com.qxiao.wx.componse.UserInfo;
+import com.qxiao.wx.fresh.vo.QmImage;
+import com.spring.entity.DataPage;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@Service
+@SuppressWarnings("unchecked")
+public class QmCommunityInfoServiceImpl extends AbstractJdbcService<QmCommunityInfo>
+		implements IQmCommunityInfoService {
+
+	@Autowired
+	private QmCommunityInfoDao communityInfoDao;
+	@Autowired
+	private QmCommunityImageDao imageDao;
+	@Autowired
+	private QmClassCommunityDao classDao;
+	@Autowired
+	private QmCommunityVideoDao videoDao;
+	@Autowired
+	private GetIdentityService identity;
+
+	@Override
+	public JPADao<QmCommunityInfo> getDao() {
+		return this.communityInfoDao;
+	}
+
+	@Override
+	public Class<QmCommunityInfo> getEntityClass() {
+		return QmCommunityInfo.class;
+	}
+
+	@Override
+	@Transactional
+	public QmCommunityInfo addCommunityInfo(String openId, String textContent, JSONArray images, String video,
+			int contentType, Long classId) {
+		QmCommunityInfo info = new QmCommunityInfo();
+		info.setOpenId(openId);
+		info.setTextContent(textContent);
+		info.setContentType(contentType);
+		info.setIsDel(0);
+		info.setSerial(0);
+		info.setPostTime(new Date());
+		QmCommunityInfo communityInfo = communityInfoDao.save(info);
+
+		// 班级信息
+		this.addCommunityClass(classId, communityInfo);
+
+
+		// 保存图片
+		if (images.length() > 0) {
+			this.addCommunityImage(communityInfo, images);
+		}
+
+		// 保存视频
+		if (StringUtils.isNotEmpty(video)) {
+			this.addCommunityVideo(video, communityInfo);
+		}
+
+//		if (communityInfo != null) {
+//			List<QmPatriarch> patriarchs = patriarchDao.findByClassId(classId);
+//			// 注册的微信-模板Id
+//			String regTempId = StartOnLoad.TEMPLATE_ID;
+//			// 跳转url
+//			String url = "http://23ti245684.imwork.net/qxiao-mp/action/mod-xiaojiao/notice/noticeDetail.do";
+//			for (QmPatriarch par : patriarchs) {
+//				Map<String, TemplateData> param = new HashMap<>();
+//				param.put("first", new TemplateData("班级圈有新的动静啦—_—", "#696969"));
+//				param.put("keyword1", new TemplateData(communityInfo.getTextContent(), "#696969"));
+//				param.put("keyword2", new TemplateData(image == null ? "" : image.getImageUrl(), "#696969"));
+//				param.put("remark", new TemplateData("祝大家愉快！！", "#696969"));
+//					// 调用发送微信消息给用户的接口
+//				SendMessageUtils.sendWechatMsgToUser(par.getOpenId(), regTempId, url, "#000000",
+//						SendMessageUtils.packJsonmsg(param));
+//			}
+//		}	
+		
+		return communityInfo;
+	}
+
+	private void addCommunityClass(Long classId, QmCommunityInfo communityInfo) {
+		QmClassCommunity classCommunity = new QmClassCommunity();
+		classCommunity.setClassId(classId);
+		classCommunity.setCommunityId(communityInfo.getCommunityId());
+		classCommunity.setPostTime(new Date());
+		classDao.save(classCommunity);
+	}
+
+	private void addCommunityVideo(String videoUrl, QmCommunityInfo communityInfo) {
+		QmCommunityVideo communityVideo = new QmCommunityVideo();
+		communityVideo.setCommunityId(communityInfo.getCommunityId());
+		communityVideo.setVideoUrl(videoUrl);
+		communityVideo.setPostTime(new Date());
+		videoDao.save(communityVideo);
+	}
+
+	private void addCommunityImage(QmCommunityInfo communityInfo, JSONArray imageUrls) {
+		List<QmCommunityImage> images = new ArrayList<>();
+		Iterator<Object> it = imageUrls.iterator();
+		while (it.hasNext()) {
+			String str = it.next() + "";
+			QmImage image = JsonMapper.obj2Instance(str, QmImage.class);
+			QmCommunityImage communityImage = new QmCommunityImage();
+			communityImage.setCommunityId(communityInfo.getCommunityId());
+			communityImage.setImageUrl(image.getImageUrl());
+			communityImage.setSmallUrl("small_" + image.getImageUrl());
+			communityImage.setPostTime(new Date());
+			images.add(communityImage);
+		}
+		imageDao.save(images);
+	}
+
+	@Override
+	// 班级圈信息查询
+	public List<QmCommunityInfoDTO> findByClassId(String openId, Long classId) throws ServiceException {
+		List<QmCommunityInfoDTO> dtos = this.findCommunityInfoDTOs(openId, classId);
+		if (CollectionUtils.isEmpty(dtos)) {
+			dtos = new ArrayList<>();
+		}
+		return dtos;
+	}
+
+	private List<QmCommunityInfoDTO> findCommunityInfoDTOs(String openId, Long classId) throws ServiceException {
+		return this.findWirhTeacher(classId);
+	}
+
+	private List<QmCommunityInfoDTO> findWirhTeacher(Long classId) throws ServiceException {
+		List<QmCommunityInfoDTO> infoDTOs = (List<QmCommunityInfoDTO>) super.findList(CommunitySQL.findWirhTeacher(),
+				new Object[] { classId }, QmCommunityInfoDTO.class);
+		if (CollectionUtils.isNotEmpty(infoDTOs)) {
+			for (QmCommunityInfoDTO info : infoDTOs) {
+				UserInfo user = identity.getIdentity(info.getOpenId());
+				info.setName(user.getUsername());
+				// 获取图片列表
+				this.getCommunityImageList(info);
+				// 获取点赞列表
+				this.getCommunityPraiseList(info, classId);
+				// 获取评论列表
+				this.getCommunityCommentList(info, classId);
+			}
+		} else {
+			infoDTOs = new ArrayList<>();
+		}
+		return infoDTOs;
+	}
+
+	private void getCommunityCommentList(QmCommunityInfoDTO info, Long classId) throws ServiceException {
+		DataPage<?> dataPage = super.getPage(CommunitySQL.getCommentList(), 0, 3,
+				new Object[] { info.getCommunityId(), classId }, QmCommunityCommentDTO.class);
+		List<QmCommunityCommentDTO> commentList = (List<QmCommunityCommentDTO>) dataPage.getData();
+		info.setCommentCount(Integer.parseInt(dataPage.getTotalCount() + ""));
+		info.setCommentList(commentList);
+	}
+
+	private void getCommunityPraiseList(QmCommunityInfoDTO info, Long classId) throws ServiceException {
+		DataPage<?> dataPage = (DataPage<QmCommunityPraiseDTO>) super.getPage(CommunitySQL.getPraiseList(), 1, 10,
+				new Object[] { info.getCommunityId(), classId }, QmCommunityPraiseDTO.class);
+		List<QmCommunityPraiseDTO> praiseList = (List<QmCommunityPraiseDTO>) dataPage.getData();
+		info.setPraiseCount(Integer.parseInt(dataPage.getTotalCount() + ""));
+		info.setPraiseList(praiseList);
+	}
+
+	private void getCommunityImageList(QmCommunityInfoDTO info) {
+		String sql = "select image_url as imageUrl from qm_community_image where community_id = :communityId";
+		Map<String, Object> param = new HashMap<>();
+		param.put("communityId", info.getCommunityId());
+		List<Map<String, Object>> images = super.findList(sql, param);
+		info.setImages(images);
+	}
+
+	@Override
+	// 删除班级圈
+	@Transactional
+	public void deleteCommuityInfo(String openId, Long communityId) throws ServiceException {
+		QmCommunityInfo communityInfo = communityInfoDao.findOne(communityId);
+		if (openId.equals(communityInfo.getOpenId())) {
+			communityInfo.setIsDel(1);
+			communityInfoDao.save(communityInfo);
+		} else {
+			throw new ServiceException("参数异常！" + openId);
+		}
+	}
+}

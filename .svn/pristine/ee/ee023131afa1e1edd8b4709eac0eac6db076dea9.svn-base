@@ -1,0 +1,22 @@
+package com.qxiao.wx.user.jpa.dao;
+
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.user.jpa.entity.QmClockStat;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmClockStatDao extends JPADao<QmClockStat>{
+
+	@Query("SELECT COUNT(*) FROM QmClassStudent where classId=?1")
+	Integer countByClassId(Long classId);
+
+	@Query("SELECT COUNT(*) FROM QmStudent as qs,QmClockInfo as qci " + 
+			"where (qci.ibeaconId=qs.ibeaconId or qci.nfcId=qs.nfcId) and qs.studentId=?1 " + 
+			"and DATE_FORMAT(qci.postTime,'%Y-%m-%d')=?2")
+	Integer countByStudentId(Long studentId,String postTime);
+
+	List<QmClockStat> findByStatDate(String statDate);
+}

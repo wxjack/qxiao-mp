@@ -1,0 +1,25 @@
+package com.qxiao.wx.user.jpa.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.Query;
+
+import com.qxiao.wx.user.jpa.entity.QmPlaySchoolTeacher;
+import com.spring.jpa.dao.JPADao;
+
+public interface QmPlaySchoolTeacherDao extends JPADao<QmPlaySchoolTeacher>{
+
+	QmPlaySchoolTeacher findByTel(String tel);
+
+	@Query("select a from QmPlaySchoolTeacher as a where teacher_id=?1 and status=0")
+	QmPlaySchoolTeacher findByTeacherId(Long teacherId);
+
+	QmPlaySchoolTeacher findByOpenId(String openId);
+	
+	@Query(nativeQuery = true, value = "SELECT qpst.* FROM qm_play_school_teacher AS qpst "
+			+ "JOIN qm_class_teacher AS qct ON qct.teacher_id = qpst.teacher_id "
+			+ "JOIN qm_play_school_class AS qpsc ON qpsc.class_id = qct.class_id "
+			+ "JOIN qm_play_school_info AS qpsi ON qpsi.school_id = qpsc.school_id "
+			+ "WHERE qpsi.school_id = ?1 AND qpst.status = 0 GROUP BY qpst.teacher_id")
+	List<QmPlaySchoolTeacher> findBySchoolId(Long schoolId);
+}

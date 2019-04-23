@@ -1,0 +1,217 @@
+package com.qxiao.wx.fresh.controller;
+
+import java.io.IOException;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.qxiao.wx.fresh.dto.QmFreshDetailDTO;
+import com.qxiao.wx.fresh.dto.QmFreshInfoDTO;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshInfo;
+import com.qxiao.wx.fresh.jpa.service.IQmFreshCommentService;
+import com.qxiao.wx.fresh.jpa.service.IQmFreshInfoService;
+import com.qxiao.wx.fresh.vo.QmCommentVO;
+import com.qxiao.wx.user.jpa.entity.QmAccount;
+import com.qxiao.wx.user.jpa.service.IQmAccountService;
+import com.spring.entity.DataPage;
+import com.spring.web.controller.ResponseMessage;
+import com.spring.web.utils.HttpServletRequestBody;
+
+@CrossOrigin
+@RestController
+@RequestMapping(value = "action/mod-xiaojiao/fresh")
+public class QmFreshInfoController {
+
+	private final Logger log = Logger.getLogger(QmFreshInfoController.class);
+
+	@Autowired
+	private IQmFreshInfoService freshInfoService;
+	@Autowired
+	private IQmAccountService accountService;
+	@Autowired
+	private IQmFreshCommentService commentService;
+
+	// 速报列表查询
+	@PostMapping(value = "/freshQuery.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage freshQuery(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			Long classId = json.getLong("classId");
+			Long studentId = json.getLong("studentId");
+			int page = json.getInt("page");
+			int pageSize = json.getInt("pageSize");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				if (StringUtils.isNotEmpty(classId + "")) {
+					DataPage<QmFreshInfoDTO> dataPage = freshInfoService.freshQuery(openId, classId, studentId, page,
+							pageSize);
+					List<QmFreshInfoDTO> data = (List<QmFreshInfoDTO>) dataPage.getData();
+					if (CollectionUtils.isNotEmpty(data)) {
+						for (QmFreshInfoDTO dto : data) {
+							dto.setTextContent(dto.getTextContent());
+							dto.setTitle(dto.getTitle());
+						}
+					}
+					res.setData(dataPage);
+				}
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 速报详情
+	@PostMapping(value = "/freshDetail.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage freshDetail(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long freshId = json.getLong("freshId");
+				Long classId = json.getLong("classId");
+				Long studentId = json.getLong("studentId");
+				QmFreshDetailDTO freshDetail = freshInfoService.findFreshDetail(openId, freshId, classId, studentId);
+				if (freshDetail != null) {
+					freshDetail.setTextContent(freshDetail.getTextContent());
+					freshDetail.setTitle(freshDetail.getTitle());
+				}
+				res.setData(freshDetail);
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 新增速报
+	@PostMapping(value = "/freshAdd.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage freshAdd(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			String title = json.getString("title");
+			String textContent = json.getString("textContent");
+			JSONArray images = json.getJSONArray("images");
+			JSONArray senders = json.getJSONArray("senders");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				QmFreshInfo freshInfo = freshInfoService.addFresh(openId, title,
+						textContent, images, senders);
+				res.setData(freshInfo.getFreshId());
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (JSONException | IOException e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 速报留言
+	@PostMapping(value = "/freshCommentAdd.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage freshCommentAdd(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long freshId = json.getLong("freshId");
+				Long classId = json.getLong("classId");
+				Long studnetId = json.getLong("studentId");
+				String textContent = json.getString("textContent");
+				QmCommentVO commentVo = commentService.addComment(openId, textContent,
+						freshId, classId, studnetId);
+				res.setData(commentVo);
+				res.setErrorMsg("留言成功！");
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 删除速报
+	@PostMapping(value = "/deleteFresh.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage deleteFresh(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long freshId = json.getLong("freshId");
+				freshInfoService.deleteFresh(freshId, openId);
+				res.setErrorMsg("删除成功！");
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+
+	// 删除留言
+	@PostMapping(value = "/deleteComment.do", produces = "application/json;charset=UTF-8")
+	public ResponseMessage deleteComment(HttpServletRequest req) {
+		ResponseMessage res = new ResponseMessage();
+		try {
+			JSONObject json = HttpServletRequestBody.toJSONObject(req);
+			String openId = json.getString("openId");
+			QmAccount account = accountService.exists(openId);
+			if (account != null) {
+				Long commentId = json.getLong("commentId");
+				commentService.deleteComment(commentId, openId);
+				res.setErrorMsg("删除成功！");
+			} else {
+				res.setErrorCode(306);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.setErrorCode(-1);
+			res.setErrorMsg(e.getMessage());
+			log.error(e.getMessage());
+		}
+		return res;
+	}
+}

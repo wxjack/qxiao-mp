@@ -1,0 +1,128 @@
+package com.qxiao.wx.fresh.jpa.service.impl;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.qxiao.wx.componse.GetIdentityService;
+import com.qxiao.wx.componse.UserInfo;
+import com.qxiao.wx.fresh.dto.QmFreshCommentDTO;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshCommentDao;
+import com.qxiao.wx.fresh.jpa.dao.QmFreshInfoDao;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshComment;
+import com.qxiao.wx.fresh.jpa.entity.QmFreshInfo;
+import com.qxiao.wx.fresh.jpa.service.IQmFreshCommentService;
+import com.qxiao.wx.fresh.vo.QmCommentInfoVO;
+import com.qxiao.wx.fresh.vo.QmFreshCommentStuVO;
+import com.spring.jpa.dao.JPADao;
+import com.spring.jpa.service.AbstractJdbcService;
+import com.spring.jpa.service.ServiceException;
+
+@Service
+public class QmFreshCommentServiceImpl extends AbstractJdbcService<QmFreshComment> implements IQmFreshCommentService {
+
+	@Autowired
+	private QmFreshCommentDao commentDao;
+	@Autowired
+	private QmFreshInfoDao freshDao;
+	@Autowired
+	private GetIdentityService identityService;
+
+	@Override
+	public JPADao<QmFreshComment> getDao() {
+		return this.commentDao;
+	}
+
+	@Override
+	public Class<QmFreshComment> getEntityClass() {
+		return QmFreshComment.class;
+	}
+
+	@Override
+	@Transactional
+	// 留言
+	public void addComment(String openId, String textContent, Long freshId, Long studentId) throws ServiceException {
+		QmFreshComment comment = new QmFreshComment();
+		UserInfo user = identityService.getIdentity(openId);
+		comment.setFreshId(freshId);
+		comment.setTextContent(textContent);
+		comment.setPhoto(user.getPhoto());
+		comment.setRelation(user.getRelation());
+		comment.setUserName(user.getUsername());
+		comment.setOpenId(openId);
+		comment.setPostTime(new Date());
+		commentDao.save(comment);
+	}
+
+	@Override
+	// 速报列表查询
+	public QmFreshCommentDTO findFreshComment(Long freshId, Long classId)
+			throws IllegalAccessException, InvocationTargetException {
+
+		QmFreshInfo freshInfo = freshDao.findOne(freshId);
+		QmFreshCommentDTO commentDTO = new QmFreshCommentDTO();
+		commentDTO.setFreshId(freshInfo.getFreshId());
+		commentDTO.setTitle(freshInfo.getTitle());
+		commentDTO.setPostTime(freshInfo.getPostTime());
+		List<QmFreshComment> comments = commentDao.findByFreshIdAndClassId(freshId, classId);
+		List<QmCommentInfoVO> infoVOs = new ArrayList<>();
+		for (QmFreshComment comment : comments) {
+			QmCommentInfoVO infoVO = new QmCommentInfoVO();
+			QmFreshCommentStuVO commentVO = this.findCommentVo(comment.getOpenId());
+			infoVO.setCommentId(comment.getCommentId());
+			infoVO.setName(commentVO.getName());
+			infoVO.setRelation(commentVO.getRelation());
+			infoVO.setPostTime(comment.getPostTime());
+			infoVOs.add(infoVO);
+		}
+		commentDTO.setContents(infoVOs);
+		return commentDTO;
+	}
+
+	private QmFreshCommentStuVO findCommentVo(String openId) {
+		UserInfo userInfo = identityService.getIdentity(openId);
+		if (userInfo.getType() == 1) {
+			// 老师留言
+			return this.getByTeacher(openId);
+		}
+		if (userInfo.getType() == 2) {
+			// 家长留言
+			return this.getByStudent(openId);
+		}
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	private QmFreshCommentStuVO getByStudent(String openId) {
+		String sql = "SELECT qs.student_name AS name, qp.relation AS relation "
+				+ "FROM qm_student AS qs JOIN qm_patriarch_student AS qps ON qs.student_id = qps.student_id "
+				+ "JOIN qm_patriarch AS qp ON qp.id = qps.patriarch_id WHERE qp.open_id = ? ";
+		List<QmFreshCommentStuVO> findList = (List<QmFreshCommentStuVO>) super.findList(sql, new Object[] { openId },
+				QmFreshCommentStuVO.class);
+		if (CollectionUtils.isNotEmpty(findList)) {
+			return findList.get(0);
+		}
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	private QmFreshCommentStuVO getByTeacher(String openId) {
+		String sql = "SELECT teacher_name AS name  FROM qm_play_school_teacher WHERE open_id = ? ";
+		List<QmFreshCommentStuVO> findList = (List<QmFreshCommentStuVO>) super.findList(sql, new Object[] { openId },
+				QmFreshCommentStuVO.class);
+		if (CollectionUtils.isNotEmpty(findList)) {
+			QmFreshCommentStuVO vo = findList.get(0);
+			vo.setRelation(0);
+			return vo;
+		}
+		return null;
+	}
+
+}
